@@ -1,0 +1,185 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "Stores user information and settings.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "name": { "type": "string" },
+        "bio": { "type": "string" },
+        "avatar": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "user"] },
+        "likedTrackIds": { "type": "array", "items": { "type": "string" } },
+        "frequencyReport": { "type": "string" },
+        "settings": {
+          "type": "object",
+          "properties": {
+            "theme": { "type": "string" },
+            "vizMode": { "type": "string" }
+          }
+        },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "role"]
+    },
+    "Insight": {
+      "title": "Saved Insight",
+      "description": "An AI-generated insight saved by a user.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "trackId": { "type": "string" },
+        "trackTitle": { "type": "string" },
+        "content": { "type": "string" },
+        "timestamp": { "type": "number" }
+      },
+      "required": ["trackId", "content", "timestamp"]
+    },
+    "Message": {
+      "title": "Community Message",
+      "description": "A message posted in the community circle.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "userName": { "type": "string" },
+        "userAvatar": { "type": "string" },
+        "text": { "type": "string" },
+        "timestamp": { "type": "object" }
+      },
+      "required": ["uid", "userName", "text", "timestamp"]
+    },
+    "SystemConfig": {
+      "title": "System Configuration",
+      "description": "Global settings and announcements.",
+      "type": "object",
+      "properties": {
+        "announcement": {
+          "type": "object",
+          "properties": {
+            "text": { "type": "string" },
+            "active": { "type": "boolean" },
+            "type": { "type": "string", "enum": ["info", "warning", "success"] }
+          }
+        },
+        "featuredTrackId": { "type": "string" },
+        "maintenanceMode": { "type": "boolean" }
+      }
+    },
+    "MediaItem": {
+      "title": "Media Item",
+      "description": "A track, video, or image in the library.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "type": { "type": "string", "enum": ["audio", "video", "image"] },
+        "url": { "type": "string" },
+        "mediaUrl": { "type": "string" },
+        "art": { "type": "string" },
+        "genre": { "type": "array", "items": { "type": "string" } },
+        "description": { "type": "string" },
+        "playlist": { "type": "string" },
+        "bpm": { "type": "number" },
+        "key": { "type": "string" },
+        "numerologyCode": { "type": "string" },
+        "createdAt": { "type": "object" }
+      },
+      "required": ["title", "type", "mediaUrl", "art"]
+    },
+    "Playlist": {
+      "title": "Playlist",
+      "description": "A collection of media items.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "art": { "type": "string" },
+        "trackIds": { "type": "array", "items": { "type": "string" } },
+        "isPublic": { "type": "boolean" },
+        "createdAt": { "type": "object" },
+        "updatedAt": { "type": "object" }
+      },
+      "required": ["title", "trackIds", "isPublic"]
+    },
+    "ListeningEvent": {
+      "title": "Listening Event",
+      "description": "A record of a user listening to a track.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "trackId": { "type": "string" },
+        "timestamp": { "type": "object" }
+      },
+      "required": ["userId", "trackId", "timestamp"]
+    },
+    "Contact": {
+      "title": "CRM Contact",
+      "description": "A contact in the frential CRM system.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string" },
+        "baseFrequency": { "type": "string" },
+        "status": { "type": "string", "enum": ["lead", "active", "completed", "divergent"] },
+        "notes": { "type": "string" },
+        "lastInteraction": { "type": "object" },
+        "assignedTo": { "type": "string" },
+        "createdAt": { "type": "object" }
+      },
+      "required": ["name", "status"]
+    },
+    "Interaction": {
+      "title": "CRM Interaction",
+      "description": "A record of an interaction with a contact.",
+      "type": "object",
+      "properties": {
+        "contactId": { "type": "string" },
+        "type": { "type": "string", "enum": ["call", "email", "synthesis", "meeting"] },
+        "summary": { "type": "string" },
+        "frequency": { "type": "string" },
+        "timestamp": { "type": "object" }
+      },
+      "required": ["contactId", "type", "timestamp"]
+    }
+  },
+  "firestore": {
+    "users/{userId}": {
+      "schema": "UserProfile",
+      "description": "Collection of user profiles."
+    },
+    "users/{userId}/insights/{insightId}": {
+      "schema": "Insight",
+      "description": "Subcollection of insights saved by a user."
+    },
+    "messages/{messageId}": {
+      "schema": "Message",
+      "description": "Collection of community messages."
+    },
+    "system/config": {
+      "schema": "SystemConfig",
+      "description": "Global system configuration document."
+    },
+    "media/{mediaId}": {
+      "schema": "MediaItem",
+      "description": "Collection of all media items (tracks, videos, etc)."
+    },
+    "playlists/{playlistId}": {
+      "schema": "Playlist",
+      "description": "Collection of curated and user playlists."
+    },
+    "listeningHistory/{eventId}": {
+      "schema": "ListeningEvent",
+      "description": "Collection of listening history events."
+    },
+    "contacts/{contactId}": {
+      "schema": "Contact",
+      "description": "Collection of CRM contacts."
+    },
+    "interactions/{interactionId}": {
+      "schema": "Interaction",
+      "description": "Collection of CRM interactions."
+    }
+  }
+}

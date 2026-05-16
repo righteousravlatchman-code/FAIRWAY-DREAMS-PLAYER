@@ -1,0 +1,166 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: {userId}
+    // Fields:
+    //   - uid: string
+    //   - name: string (required)
+    //   - bio: string
+    //   - avatar: string
+    //   - role: string (admin|user) (required)
+    //   - likedTrackIds: list
+    //   - settings: map
+    //   - updatedAt: string
+    //
+    // Collection: users/{userId}/insights
+    // Document ID: {insightId}
+    // Fields:
+    //   - id: string
+    //   - trackId: string (required)
+    //   - trackTitle: string
+    //   - content: string (required)
+    //   - timestamp: number (required)
+    //
+    // Collection: messages
+    // Document ID: {messageId}
+    // Fields:
+    //   - uid: string (required)
+    //   - userName: string (required)
+    //   - userAvatar: string
+    //   - text: string (required)
+    //   - timestamp: server_timestamp (required)
+    //
+    // Collection: playlists
+    // Document ID: {playlistId}
+    // Fields:
+    //   - userId: string (optional, owner)
+    //   - title: string (required)
+    //   - description: string
+    //   - art: string
+    //   - trackIds: list (required)
+    //   - isPublic: boolean (required)
+    //   - createdAt: timestamp
+    //   - updatedAt: timestamp
+    //
+    // Collection: listeningHistory
+    // Document ID: {eventId}
+    // Fields:
+    //   - userId: string (required)
+    //   - trackId: string (required)
+    //   - timestamp: server_timestamp (required)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && (
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'user') == 'admin') ||
+        request.auth.token.email == "righteousravlatchman@gmail.com"
+      );
+    }
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['name', 'role']) &&
+        data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+        data.role is string && data.role in ['admin', 'user'];
+    }
+
+    function isValidMessage(data) {
+      return data.keys().hasAll(['userId', 'userName', 'text', 'timestamp']) &&
+        data.userId == request.auth.uid &&
+        data.userName is string && data.userName.size() > 0 && data.userName.size() < 100 &&
+        data.text is string && data.text.size() > 0 && data.text.size() < 1000;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow get: if isAuthenticated();
+      allow list: if isAdmin();
+      allow create: if isOwner(userId) && isValidUser(request.resource.data) && (request.resource.data.role == 'user' || isAdmin());
+      allow update: if isAuthenticated() && isValidUser(request.resource.data) && 
+        ((isOwner(userId) && request.resource.data.role == resource.data.role) || isAdmin());
+      allow delete: if isAdmin();
+
+      match /insights/{insightId} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow write: if isOwner(userId) || isAdmin();
+      }
+    }
+
+    match /messages/{messageId} {
+      allow read: if true;
+      allow create: if isAuthenticated() && isValidMessage(request.resource.data);
+      allow update: if isAdmin();
+      allow delete: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid);
+    }
+
+    match /live_chat/{trackId}/messages/{messageId} {
+      allow read: if true;
+      allow create: if isAuthenticated() && 
+        request.resource.data.userId == request.auth.uid &&
+        request.resource.data.text is string && 
+        request.resource.data.text.size() < 500;
+      allow delete: if isAdmin();
+    }
+
+    match /system/{document=**} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /media/{mediaId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /playlists/{playlistId} {
+      // Allow getting a specific playlist if it's public, you own it, or you are admin
+      allow get: if resource.data.isPublic == true || (isAuthenticated() && resource.data.userId == request.auth.uid) || isAdmin();
+      // Allow listing playlists - this is tricky with resource.data. 
+      // If we want users to be able to query for public playlists, we must allow list: if true and enforce via queries, 
+      // or allow list if the query filters by isPublic == true.
+      allow list: if isAdmin() || (isAuthenticated() && (resource == null || resource.data.isPublic == true || resource.data.userId == request.auth.uid));
+      
+      allow create: if isAuthenticated() && (request.resource.data.userId == request.auth.uid || isAdmin());
+      allow update: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+    }
+
+    match /listeningHistory/{eventId} {
+      allow get: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid);
+      allow list: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid);
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update: if false;
+      allow delete: if isAdmin();
+    }
+
+    match /contacts/{contactId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /interactions/{interactionId} {
+      allow read, write: if isAdmin();
+    }
+  }
+}
