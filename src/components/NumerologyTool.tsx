@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Sparkles, Calculator, ChevronRight, RefreshCw } from 'lucide-react';
+import { Sparkles, Calculator, ChevronRight, RefreshCw, Star, Target, Compass, Zap, Shield, Heart, Gem, Ghost, Book, Globe } from 'lucide-react';
 import { TRACKS } from '../constants';
 import { Track } from '../types';
+import { MetalIcon } from './MetalIcon';
 
 interface NumerologyToolProps {
   userData: { name: string; birthDate: string };
@@ -108,7 +109,7 @@ export const NumerologyTool: React.FC<NumerologyToolProps> = ({ userData, onRese
   return (
     <div className="glass-panel rounded-[2rem] p-8 md:p-12 overflow-hidden relative">
       <div className="absolute top-0 right-0 p-8 opacity-10">
-        <Calculator size={120} />
+        <MetalIcon iconName="Calculator" type="silver" size={120} />
       </div>
       
       <div className="absolute top-0 left-0 w-full h-full opacity-[0.02] pointer-events-none flex gap-1 items-end">
@@ -125,8 +126,8 @@ export const NumerologyTool: React.FC<NumerologyToolProps> = ({ userData, onRese
       <div className="relative z-10">
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl gold-gradient flex items-center justify-center text-black">
-              <Calculator size={20} />
+            <div className="w-10 h-10 rounded-xl bg-gold/10 flex items-center justify-center border border-gold/20 shadow-lg shadow-gold/5">
+              <MetalIcon iconName="Calculator" type="gold" size={20} />
             </div>
             <div>
               <h3 className="font-display text-xl text-white tracking-widest uppercase">Alignment Tool</h3>
@@ -213,7 +214,7 @@ export const NumerologyTool: React.FC<NumerologyToolProps> = ({ userData, onRese
                 </div>
                 
                 <div className="relative w-20 h-20 rounded-lg overflow-hidden flex-shrink-0 z-10">
-                  <img src={result.alignedTrack.art} alt={result.alignedTrack.title} className="w-full h-full object-cover" />
+                  <img src={result.alignedTrack.art || '/src/assets/images/default_cover_1779345608057.png'} alt={result.alignedTrack.title} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                   <div className="absolute bottom-0 left-0 w-full flex gap-0.5 h-1 items-end opacity-50">
                     {[1, 2, 3, 4, 5].map(i => (
                       <motion.div

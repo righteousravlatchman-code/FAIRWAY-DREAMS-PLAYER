@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Sparkles, RefreshCw, Zap, Moon, Sun, Ghost, Command } from 'lucide-react';
 import { GoogleGenAI } from "@google/genai";
+import { MetalIcon } from './MetalIcon';
 
 interface Card {
   title: string;
@@ -49,8 +50,8 @@ export const QuantumOracle: React.FC = () => {
   return (
     <div className="max-w-xl mx-auto space-y-12 py-8">
       <div className="text-center space-y-4">
-        <div className="inline-flex p-4 rounded-3xl bg-gold/10 text-gold border border-gold/20 mb-4">
-          <Command size={32} />
+        <div className="inline-flex p-4 rounded-3xl bg-gold/10 border border-gold/20 mb-4 shadow-xl shadow-gold/5">
+          <MetalIcon iconName="Command" type="gold" size={32} />
         </div>
         <h2 className="text-4xl font-display text-white tracking-widest uppercase">Quantum Oracle</h2>
         <p className="text-xs text-zinc-500 uppercase tracking-widest max-w-sm mx-auto">
@@ -71,7 +72,7 @@ export const QuantumOracle: React.FC = () => {
             >
               <div className="w-24 h-24 rounded-full border border-gold/10 flex items-center justify-center mb-8 relative">
                 <div className="absolute inset-0 rounded-full border-2 border-gold/20 animate-spin-slow" />
-                <Sparkles className="text-gold group-hover:scale-120 transition-transform" size={40} />
+                <MetalIcon iconName="Sparkles" type="gold" size={40} className="group-hover:scale-120 transition-transform" />
               </div>
               <p className="text-gold font-display text-lg tracking-widest uppercase mb-2">Initialize Draw</p>
               <p className="text-[10px] text-zinc-600 uppercase tracking-widest">Connect to field</p>
@@ -110,7 +111,7 @@ export const QuantumOracle: React.FC = () => {
                   
                   <div className="p-6 rounded-2xl bg-gold/5 border border-gold/10">
                     <h5 className="text-[10px] uppercase tracking-widest text-gold mb-2 flex items-center gap-2">
-                       <Zap size={12} /> Strategic Directive
+                       <MetalIcon iconName="Zap" type="gold" size={12} /> Strategic Directive
                     </h5>
                     <p className="text-sm text-white font-medium">
                       {card.advice}

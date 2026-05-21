@@ -1,7 +1,10 @@
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Sparkles, RefreshCw, Compass, Moon, TreePine, Sun } from 'lucide-react';
+import { Sparkles, RefreshCw, Compass, Moon, TreePine, Sun, Volume2, Pause, Loader2, Gem, Ghost, Book, Calendar, Clock, Mic2, Fingerprint, Eye, Bird, Fish, Feather, Rabbit, Bug, Shield, Flame, Waves, Wind, Skull, Hand, Tent, Map, Grid, Trash2, Zap, Globe, Sparkle, Cat, Mouse, Award, Dog } from 'lucide-react';
 import { VedicAstrology, ArabianAstrology, DruidAstrology, MayanAstrology } from '../services/astrologyService';
+import { useAudioNarrator } from '../hooks/useAudioNarrator';
+import { useToast } from './ToastProvider';
+import { MetalIcon } from './MetalIcon';
 
 interface AstrologyToolProps {
   userData: { name: string; birthDate: string };
@@ -12,6 +15,18 @@ type Tradition = 'vedic' | 'arabian' | 'druid' | 'mayan';
 
 export const AstrologyTool: React.FC<AstrologyToolProps> = ({ userData, onReset }) => {
   const [activeTradition, setActiveTradition] = useState<Tradition>('vedic');
+  const { isPlaying, audioLoading, toggleData, setAudioBuffer } = useAudioNarrator();
+
+  const handleToggleAudio = () => {
+    const data: any = {
+      vedic: vedicData,
+      arabian: arabianData,
+      druid: druidData,
+      mayan: mayanData
+    };
+    
+    toggleData(`Multi-Tradition Celestial Alignment for ${userData.name}`, data);
+  };
 
   // Helper to approximate celestial positions for demonstration
   const celestialPositions = useMemo(() => {
@@ -68,11 +83,53 @@ export const AstrologyTool: React.FC<AstrologyToolProps> = ({ userData, onReset 
   }, [userData.birthDate]);
 
   const traditions = [
-    { id: 'vedic', name: 'Vedic', icon: <Compass size={14} />, color: 'text-orange-400' },
-    { id: 'arabian', name: 'Arabian', icon: <Moon size={14} />, color: 'text-emerald-400' },
-    { id: 'druid', name: 'Druid', icon: <TreePine size={14} />, color: 'text-lime-400' },
-    { id: 'mayan', name: 'Mayan', icon: <Sun size={14} />, color: 'text-amber-400' },
+    { id: 'vedic', name: 'Vedic', icon: <MetalIcon iconName="Compass" size={14} type="gold" />, color: 'text-orange-400' },
+    { id: 'arabian', name: 'Arabian', icon: <MetalIcon iconName="Moon" size={14} type="silver" />, color: 'text-emerald-400' },
+    { id: 'druid', name: 'Druid', icon: <MetalIcon iconName="TreePine" size={14} type="steel" />, color: 'text-lime-400' },
+    { id: 'mayan', name: 'Mayan', icon: <MetalIcon iconName="Sun" size={14} type="gold" />, color: 'text-amber-400' },
   ];
+
+  const getDruidTotemIcon = (animal: string) => {
+    switch (animal) {
+      case 'White Stag': return 'Gem';
+      case 'Dragon': return 'Flame';
+      case 'Serpent': return 'Waves';
+      case 'Raven': return 'Bird';
+      case 'Hare': return 'Rabbit';
+      case 'Bee': return 'Bug';
+      case 'White Horse': return 'Zap';
+      case 'Unicorn': return 'Sparkle';
+      case 'Salmon': return 'Fish';
+      case 'Swan': return 'Feather';
+      case 'Boar': return 'Shield';
+      case 'Owl': return 'Eye';
+      default: return 'HelpCircle';
+    }
+  };
+
+  const getMayanDayIcon = (symbol: string) => {
+    if (symbol.includes('Dragon') || symbol.includes('Crocodile')) return 'Flame';
+    if (symbol.includes('Wind')) return 'Wind';
+    if (symbol.includes('Night')) return 'Moon';
+    if (symbol.includes('Seed') || symbol.includes('Lizard')) return 'TreePine';
+    if (symbol.includes('Serpent')) return 'Waves';
+    if (symbol.includes('Death')) return 'Skull';
+    if (symbol.includes('Hand') || symbol.includes('Deer')) return 'Hand';
+    if (symbol.includes('Star') || symbol.includes('Rabbit')) return 'Rabbit';
+    if (symbol.includes('Water') || symbol.includes('Moon')) return 'Waves';
+    if (symbol.includes('Dog')) return 'Dog';
+    if (symbol.includes('Monkey')) return 'Award';
+    if (symbol.includes('Road')) return 'Map';
+    if (symbol.includes('Reed')) return 'Grid';
+    if (symbol.includes('Jaguar')) return 'Cat';
+    if (symbol.includes('Eagle')) return 'Bird';
+    if (symbol.includes('Vulture')) return 'Bird';
+    if (symbol.includes('Earth')) return 'Globe';
+    if (symbol.includes('Flint') || symbol.includes('Mirror')) return 'Sparkle';
+    if (symbol.includes('Storm')) return 'Zap';
+    if (symbol.includes('Sun') || symbol.includes('Lord')) return 'Sun';
+    return 'HelpCircle';
+  };
 
   return (
     <div className="glass-panel p-8 rounded-3xl relative overflow-hidden">
@@ -90,6 +147,18 @@ export const AstrologyTool: React.FC<AstrologyToolProps> = ({ userData, onReset 
         </div>
         
         <div className="flex flex-wrap gap-2">
+          <button 
+            onClick={handleToggleAudio}
+            disabled={audioLoading}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] uppercase tracking-widest font-bold border transition-all ${
+              isPlaying 
+              ? 'bg-gold text-black border-gold shadow-[0_0_20px_rgba(201,168,76,0.2)]' 
+              : 'bg-gold/10 text-gold border-gold/20 hover:bg-gold/20'
+            }`}
+          >
+            {audioLoading ? <Loader2 size={12} className="animate-spin" /> : isPlaying ? <Pause size={12} /> : <Volume2 size={12} />}
+            {isPlaying ? 'Stop' : 'Briefing'}
+          </button>
           {traditions.map((t) => (
             <button
               key={t.id}
@@ -158,15 +227,25 @@ export const AstrologyTool: React.FC<AstrologyToolProps> = ({ userData, onReset 
               {activeTradition === 'vedic' && (
                 <div className="space-y-6">
                   <div className="grid md:grid-cols-2 gap-4">
-                    <div className="p-6 rounded-2xl bg-orange-500/5 border border-orange-500/10">
-                      <p className="text-[10px] uppercase tracking-widest text-orange-400 mb-2">Nakshatra (Lunar Mansion)</p>
-                      <h4 className="text-white font-display text-xl tracking-widest mb-1">{vedicData.nakshatra.name}</h4>
-                      <p className="text-zinc-500 text-[10px] uppercase tracking-widest">Lord: {vedicData.nakshatra.lord} | Pada: {vedicData.nakshatra.pada}</p>
+                    <div className="p-6 rounded-2xl bg-orange-500/5 border border-orange-500/10 flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-xl bg-orange-500/10 flex items-center justify-center">
+                        <MetalIcon iconName="Sparkles" type="gold" size={24} />
+                      </div>
+                      <div>
+                        <p className="text-[10px] uppercase tracking-widest text-orange-400 mb-1">Nakshatra (Lunar Mansion)</p>
+                        <h4 className="text-white font-display text-xl tracking-widest leading-none">{vedicData.nakshatra.name}</h4>
+                        <p className="text-zinc-500 text-[10px] uppercase tracking-widest mt-1">Lord: {vedicData.nakshatra.lord} | Pada: {vedicData.nakshatra.pada}</p>
+                      </div>
                     </div>
-                    <div className="p-6 rounded-2xl bg-orange-500/5 border border-orange-500/10">
-                      <p className="text-[10px] uppercase tracking-widest text-orange-400 mb-2">Rashi (Moon Sign)</p>
-                      <h4 className="text-white font-display text-xl tracking-widest mb-1">{vedicData.rashi.rashi}</h4>
-                      <p className="text-zinc-500 text-[10px] uppercase tracking-widest">Sidereal: {vedicData.rashi.siderealDegrees}°</p>
+                    <div className="p-6 rounded-2xl bg-orange-500/5 border border-orange-500/10 flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-xl bg-orange-500/10 flex items-center justify-center">
+                        <MetalIcon iconName="Compass" type="gold" size={24} />
+                      </div>
+                      <div>
+                        <p className="text-[10px] uppercase tracking-widest text-orange-400 mb-1">Rashi (Moon Sign)</p>
+                        <h4 className="text-white font-display text-xl tracking-widest leading-none">{vedicData.rashi.rashi}</h4>
+                        <p className="text-zinc-500 text-[10px] uppercase tracking-widest mt-1">Sidereal: {vedicData.rashi.siderealDegrees}°</p>
+                      </div>
                     </div>
                   </div>
                   
@@ -221,22 +300,38 @@ export const AstrologyTool: React.FC<AstrologyToolProps> = ({ userData, onReset 
               {activeTradition === 'arabian' && (
                 <div className="space-y-6">
                   <div className="grid md:grid-cols-2 gap-4">
-                    <div className="p-6 rounded-2xl bg-emerald-500/5 border border-emerald-500/10">
-                      <p className="text-[10px] uppercase tracking-widest text-emerald-400 mb-2">Part of Fortune</p>
-                      <h4 className="text-white font-display text-lg tracking-widest mb-1">{arabianData.parts.partOfFortune.sign}</h4>
-                      <p className="text-zinc-500 text-[9px] leading-relaxed italic">{arabianData.parts.partOfFortune.meaning}</p>
+                    <div className="p-6 rounded-2xl bg-emerald-500/5 border border-emerald-500/10 flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-xl bg-emerald-500/10 flex items-center justify-center">
+                        <MetalIcon iconName="Gem" type="silver" size={24} />
+                      </div>
+                      <div>
+                        <p className="text-[10px] uppercase tracking-widest text-emerald-400 mb-1">Part of Fortune</p>
+                        <h4 className="text-white font-display text-lg tracking-widest leading-none">{arabianData.parts.partOfFortune.sign}</h4>
+                        <p className="text-zinc-500 text-[9px] leading-relaxed italic mt-1">{arabianData.parts.partOfFortune.meaning}</p>
+                      </div>
                     </div>
-                    <div className="p-6 rounded-2xl bg-emerald-500/5 border border-emerald-500/10">
-                      <p className="text-[10px] uppercase tracking-widest text-emerald-400 mb-2">Part of Spirit</p>
-                      <h4 className="text-white font-display text-lg tracking-widest mb-1">{arabianData.parts.partOfSpirit.sign}</h4>
-                      <p className="text-zinc-500 text-[9px] leading-relaxed italic">{arabianData.parts.partOfSpirit.meaning}</p>
+                    <div className="p-6 rounded-2xl bg-emerald-500/5 border border-emerald-500/10 flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-xl bg-emerald-500/10 flex items-center justify-center">
+                        <MetalIcon iconName="Ghost" type="silver" size={24} />
+                      </div>
+                      <div>
+                        <p className="text-[10px] uppercase tracking-widest text-emerald-400 mb-1">Part of Spirit</p>
+                        <h4 className="text-white font-display text-lg tracking-widest leading-none">{arabianData.parts.partOfSpirit.sign}</h4>
+                        <p className="text-zinc-500 text-[9px] leading-relaxed italic mt-1">{arabianData.parts.partOfSpirit.meaning}</p>
+                      </div>
                     </div>
                   </div>
                   
-                  <div className="p-6 rounded-2xl bg-white/5 border border-white/5">
-                    <p className="text-[10px] uppercase tracking-widest text-emerald-400 mb-2">Lunar Manzil (Station)</p>
-                    <h4 className="text-white font-display text-xl tracking-widest mb-1">{arabianData.mansion.name}</h4>
-                    <p className="text-zinc-400 text-xs mb-4">"{arabianData.mansion.meaning}"</p>
+                  <div className="p-6 rounded-2xl bg-white/5 border border-white/5 flex items-center gap-6">
+                    <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center border border-white/10 shrink-0 shadow-inner">
+                      <MetalIcon iconName="Moon" type="silver" size={32} />
+                    </div>
+                    <div>
+                      <p className="text-[10px] uppercase tracking-widest text-emerald-400 mb-1">Lunar Manzil (Station)</p>
+                      <h4 className="text-white font-display text-xl tracking-widest leading-none">{arabianData.mansion.name}</h4>
+                      <p className="text-zinc-400 text-xs mt-2">"{arabianData.mansion.meaning}"</p>
+                    </div>
+                  </div>
                     <div className="p-4 rounded-xl bg-emerald-500/5 border border-emerald-500/10 mb-4">
                       <p className="text-[10px] text-zinc-500 uppercase tracking-widest mb-1">Traditional Use</p>
                       <p className="text-white text-xs italic">{arabianData.mansion.use}</p>
@@ -248,21 +343,30 @@ export const AstrologyTool: React.FC<AstrologyToolProps> = ({ userData, onReset 
                       </p>
                     </div>
                   </div>
-                </div>
-              )}
+                )}
 
               {activeTradition === 'druid' && (
                 <div className="space-y-6">
                   <div className="grid md:grid-cols-2 gap-4">
-                    <div className="p-6 rounded-2xl bg-lime-500/5 border border-lime-500/10">
-                      <p className="text-[10px] uppercase tracking-widest text-lime-400 mb-2">Celtic Tree Sign</p>
-                      <h4 className="text-white font-display text-xl tracking-widest mb-1">{druidData.tree.tree}</h4>
-                      <p className="text-zinc-500 text-[10px] uppercase tracking-widest">Symbol: {druidData.tree.symbol}</p>
+                    <div className="p-6 rounded-2xl bg-lime-500/5 border border-lime-500/10 flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-xl bg-lime-500/10 flex items-center justify-center">
+                        <MetalIcon iconName="TreePine" type="steel" size={24} />
+                      </div>
+                      <div>
+                        <p className="text-[10px] uppercase tracking-widest text-lime-400 mb-1">Celtic Tree Sign</p>
+                        <h4 className="text-white font-display text-xl tracking-widest leading-none">{druidData.tree.tree}</h4>
+                        <p className="text-zinc-500 text-[10px] uppercase tracking-widest mt-1">Symbol: {druidData.tree.symbol}</p>
+                      </div>
                     </div>
-                    <div className="p-6 rounded-2xl bg-lime-500/5 border border-lime-500/10">
-                      <p className="text-[10px] uppercase tracking-widest text-lime-400 mb-2">Totem Animal</p>
-                      <h4 className="text-white font-display text-xl tracking-widest mb-1">{druidData.totem.animal}</h4>
-                      <p className="text-zinc-500 text-[9px] italic">{druidData.totem.meaning}</p>
+                    <div className="p-6 rounded-2xl bg-lime-500/5 border border-lime-500/10 flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-xl bg-lime-500/10 flex items-center justify-center">
+                        <MetalIcon iconName={getDruidTotemIcon(druidData.totem.animal)} type="silver" size={24} />
+                      </div>
+                      <div>
+                        <p className="text-[10px] uppercase tracking-widest text-lime-400 mb-1">Totem Animal</p>
+                        <h4 className="text-white font-display text-xl tracking-widest leading-none">{druidData.totem.animal}</h4>
+                        <p className="text-zinc-500 text-[9px] italic mt-1">{druidData.totem.meaning}</p>
+                      </div>
                     </div>
                   </div>
                   
@@ -302,15 +406,25 @@ export const AstrologyTool: React.FC<AstrologyToolProps> = ({ userData, onReset 
               {activeTradition === 'mayan' && (
                 <div className="space-y-6">
                   <div className="grid md:grid-cols-2 gap-4">
-                    <div className="p-6 rounded-2xl bg-amber-500/5 border border-amber-500/10">
-                      <p className="text-[10px] uppercase tracking-widest text-amber-400 mb-2">Tzolkin Day Sign</p>
-                      <h4 className="text-white font-display text-xl tracking-widest mb-1">{mayanData.tzolkin.daySign.name}</h4>
-                      <p className="text-zinc-500 text-[10px] uppercase tracking-widest">Symbol: {mayanData.tzolkin.daySign.symbol}</p>
+                    <div className="p-6 rounded-2xl bg-amber-500/5 border border-amber-500/10 flex items-center gap-4">
+                      <div className="w-14 h-14 rounded-xl bg-amber-500/10 flex items-center justify-center shrink-0 border border-amber-500/10">
+                        <MetalIcon iconName={getMayanDayIcon(mayanData.tzolkin.daySign.symbol)} type="gold" size={32} />
+                      </div>
+                      <div>
+                        <p className="text-[10px] uppercase tracking-widest text-amber-400 mb-1">Tzolkin Day Sign</p>
+                        <h4 className="text-white font-display text-xl tracking-widest leading-none">{mayanData.tzolkin.daySign.name}</h4>
+                        <p className="text-zinc-500 text-[10px] uppercase tracking-widest mt-1">Spirit: {mayanData.tzolkin.daySign.symbol}</p>
+                      </div>
                     </div>
-                    <div className="p-6 rounded-2xl bg-amber-500/5 border border-amber-500/10">
-                      <p className="text-[10px] uppercase tracking-widest text-amber-400 mb-2">Galactic Tone</p>
-                      <h4 className="text-white font-display text-xl tracking-widest mb-1">{mayanData.tzolkin.tone.name}</h4>
-                      <p className="text-zinc-500 text-[10px] uppercase tracking-widest">Number: {mayanData.tzolkin.tone.number}</p>
+                    <div className="p-6 rounded-2xl bg-amber-500/5 border border-amber-500/10 flex items-center gap-4">
+                      <div className="w-14 h-14 rounded-xl bg-amber-500/10 flex items-center justify-center shrink-0 border border-amber-500/10">
+                        <MetalIcon iconName="Mic2" type="gold" size={32} />
+                      </div>
+                      <div>
+                        <p className="text-[10px] uppercase tracking-widest text-amber-400 mb-1">Galactic Tone</p>
+                        <h4 className="text-white font-display text-xl tracking-widest leading-none">{mayanData.tzolkin.tone.name}</h4>
+                        <p className="text-zinc-500 text-[10px] uppercase tracking-widest mt-1">Number: {mayanData.tzolkin.tone.number}</p>
+                      </div>
                     </div>
                   </div>
                   

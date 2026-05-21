@@ -1,7 +1,9 @@
 import React, { useMemo } from 'react';
 import { motion } from 'motion/react';
-import { Sparkles, RefreshCw, BarChart3, Info, Heart, Zap, Compass, Activity, Shield } from 'lucide-react';
+import { Sparkles, RefreshCw, BarChart3, Info, Heart, Zap, Compass, Activity, Shield, Volume2, Pause, Loader2, Award, Ghost, Mic2, Star } from 'lucide-react';
 import { CompleteNameReport } from '../services/letterologyService';
+import { useAudioNarrator } from '../hooks/useAudioNarrator';
+import { MetalIcon } from './MetalIcon';
 
 interface LetterologyToolProps {
   userData: { name: string; birthDate: string };
@@ -11,11 +13,24 @@ interface LetterologyToolProps {
 export const LetterologyTool: React.FC<LetterologyToolProps> = ({ userData, onReset }) => {
   const firstName = userData.name.split(' ')[0];
   const report = useMemo(() => CompleteNameReport.generateFullReport(userData.name, firstName), [userData.name, firstName]);
+  const { isPlaying, audioLoading, toggleData } = useAudioNarrator();
 
-  const StatCard = ({ title, value, subtitle, icon: Icon, color = "gold" }: any) => (
+  const handleToggleAudio = () => {
+    toggleData(`Letterology Analysis for ${userData.name}`, {
+      pythagorean: report.pythagorean,
+      chaldean: report.chaldean,
+      kabbalah: report.kabbalah,
+      letterAnalysis: {
+        elements: report.letterAnalysis.elements,
+        phonetics: report.letterAnalysis.phonetics
+      }
+    });
+  };
+
+  const StatCard = ({ title, value, subtitle, iconName, color = "gold" }: any) => (
     <div className="p-6 rounded-2xl bg-white/5 border border-white/5 relative group overflow-hidden">
-      <div className={`absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity text-${color}`}>
-        <Icon size={48} />
+      <div className={`absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-20 transition-opacity`}>
+        <MetalIcon iconName={iconName} size={48} type={color === 'gold' ? 'gold' : 'silver'} />
       </div>
       <p className="text-[10px] uppercase tracking-widest text-zinc-500 mb-2">{title}</p>
       <div className="flex items-baseline gap-2">
@@ -32,20 +47,34 @@ export const LetterologyTool: React.FC<LetterologyToolProps> = ({ userData, onRe
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
         <div className="flex items-center gap-4">
-          <div className="p-4 rounded-2xl bg-gold/10 text-gold shadow-xl shadow-gold/5">
-            <Sparkles size={32} />
+          <div className="p-4 rounded-2xl bg-gold/10 border border-gold/20 shadow-xl shadow-gold/5">
+            <MetalIcon iconName="Sparkles" type="gold" size={32} />
           </div>
           <div>
             <h3 className="font-display text-2xl text-white tracking-widest uppercase">Letterology Intelligence</h3>
             <p className="text-[10px] text-zinc-500 uppercase tracking-[0.3em]">Multi-System Phonetic Signal Analysis</p>
           </div>
         </div>
-        <button 
-          onClick={onReset} 
-          className="self-start md:self-center flex items-center gap-2 px-6 py-3 rounded-xl bg-white/5 text-zinc-500 hover:text-gold hover:bg-white/10 transition-all text-[10px] uppercase tracking-widest font-bold border border-white/5"
-        >
-          <RefreshCw size={14} /> New Analysis
-        </button>
+        <div className="flex gap-3 self-start md:self-center">
+          <button 
+            onClick={handleToggleAudio}
+            disabled={audioLoading}
+            className={`flex items-center gap-2 px-6 py-3 rounded-xl border transition-all text-[10px] uppercase tracking-widest font-bold ${
+              isPlaying 
+              ? 'bg-gold text-black border-gold shadow-[0_0_20px_rgba(201,168,76,0.2)]' 
+              : 'bg-gold/10 text-gold border-gold/20 hover:bg-gold/20'
+            }`}
+          >
+            {audioLoading ? <Loader2 size={14} className="animate-spin" /> : isPlaying ? <Pause size={14} /> : <Volume2 size={14} />}
+            {isPlaying ? 'Stop' : 'Briefing'}
+          </button>
+          <button 
+            onClick={onReset} 
+            className="flex items-center gap-2 px-6 py-3 rounded-xl bg-white/5 text-zinc-500 hover:text-gold hover:bg-white/10 transition-all text-[10px] uppercase tracking-widest font-bold border border-white/5"
+          >
+            <RefreshCw size={14} /> New Analysis
+          </button>
+        </div>
       </div>
 
       <div className="grid lg:grid-cols-3 gap-8">
@@ -56,19 +85,19 @@ export const LetterologyTool: React.FC<LetterologyToolProps> = ({ userData, onRe
               title="Expression" 
               value={report.pythagorean.expression.number} 
               subtitle={report.pythagorean.expression.keyword}
-              icon={Zap}
+              iconName="Zap"
             />
             <StatCard 
               title="Soul Urge" 
               value={report.pythagorean.soulUrge.number} 
               subtitle={report.pythagorean.soulUrge.keyword}
-              icon={Heart}
+              iconName="Heart"
             />
             <StatCard 
               title="Personality" 
               value={report.pythagorean.personality.number} 
               subtitle={report.pythagorean.personality.keyword}
-              icon={Shield}
+              iconName="Shield"
             />
           </div>
 
@@ -77,7 +106,7 @@ export const LetterologyTool: React.FC<LetterologyToolProps> = ({ userData, onRe
             {/* Traits */}
             <div className="p-8 rounded-3xl bg-white/5 border border-white/5">
               <h4 className="text-white font-display text-sm tracking-widest mb-6 uppercase flex items-center gap-2">
-                <Activity size={16} className="text-gold" /> Core Traits
+                <MetalIcon iconName="Activity" type="gold" size={16} /> Core Traits
               </h4>
               <div className="space-y-4">
                 <div className="flex gap-4">
@@ -129,7 +158,7 @@ export const LetterologyTool: React.FC<LetterologyToolProps> = ({ userData, onRe
             {/* Karmic Lessons */}
             <div className="p-8 rounded-3xl bg-white/5 border border-white/5">
               <h4 className="text-white font-display text-sm tracking-widest mb-6 uppercase flex items-center gap-2">
-                <Compass size={16} className="text-gold" /> Karmic Lessons
+                <MetalIcon iconName="Compass" type="gold" size={16} /> Karmic Lessons
               </h4>
               {report.pythagorean.karmicLessons.missingNumbers.length > 0 ? (
                 <div className="space-y-3">
@@ -147,11 +176,11 @@ export const LetterologyTool: React.FC<LetterologyToolProps> = ({ userData, onRe
           </div>
 
           {/* Letter Frequency & Elements */}
-          <div className="p-8 rounded-3xl bg-white/5 border border-white/5">
-            <div className="flex items-center justify-between mb-8">
-              <h4 className="text-white font-display text-sm tracking-widest uppercase flex items-center gap-2">
-                <BarChart3 size={16} className="text-gold" /> Elemental Balance
-              </h4>
+            <div className="p-8 rounded-3xl bg-white/5 border border-white/5">
+              <div className="flex items-center justify-between mb-8">
+                <h4 className="text-white font-display text-sm tracking-widest uppercase flex items-center gap-2">
+                  <MetalIcon iconName="BarChart3" type="gold" size={16} /> Elemental Balance
+                </h4>
               <div className="text-[10px] text-zinc-500 uppercase tracking-widest">
                 Dominant: <span className="text-gold">{report.letterAnalysis.elements.dominant}</span>
               </div>
@@ -177,11 +206,11 @@ export const LetterologyTool: React.FC<LetterologyToolProps> = ({ userData, onRe
           </div>
 
           {/* Phonetic Flow */}
-          <div className="p-8 rounded-3xl bg-white/5 border border-white/5">
-            <div className="flex items-center justify-between mb-8">
-              <h4 className="text-white font-display text-sm tracking-widest uppercase flex items-center gap-2">
-                <Activity size={16} className="text-gold" /> Phonetic Signal Flow
-              </h4>
+            <div className="p-8 rounded-3xl bg-white/5 border border-white/5">
+              <div className="flex items-center justify-between mb-8">
+                <h4 className="text-white font-display text-sm tracking-widest uppercase flex items-center gap-2">
+                  <MetalIcon iconName="Activity" type="gold" size={16} /> Phonetic Signal Flow
+                </h4>
               <div className="text-[10px] text-zinc-500 uppercase tracking-widest">
                 Complexity: <span className="text-gold">{report.letterAnalysis.phonetics.complexity}%</span>
               </div>

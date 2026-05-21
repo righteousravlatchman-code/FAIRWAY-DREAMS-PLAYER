@@ -183,7 +183,7 @@ export const LiveStage: React.FC<LiveStageProps> = ({ currentTrack, user, profil
                           transition={{ duration: 2, repeat: Infinity }}
                         >
                           <img 
-                            src={currentTrack.art} 
+                            src={currentTrack.art || '/src/assets/images/default_cover_1779345608057.png'} 
                             alt={currentTrack.title}
                             className="w-48 h-48 rounded-2xl object-cover shadow-2xl border-2 border-gold/20"
                             referrerPolicy="no-referrer"

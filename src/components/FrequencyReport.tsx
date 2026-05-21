@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { FileText, Sparkles, Download, RefreshCw, Loader2, Play, Pause, Headphones, Volume2 } from 'lucide-react';
+import { FileText, Sparkles, Download, RefreshCw, Loader2, Play, Pause, Headphones, Volume2, Calendar, Zap, Target, Activity } from 'lucide-react';
 import Markdown from 'react-markdown';
-import { generateFrequencyReport, generateReportAudio } from '../services/geminiService';
+import { generateFrequencyReport, generateDailyResonance } from '../services/geminiService';
 import { useToast } from './ToastProvider';
 import { FrequencyVisualizer } from './FrequencyVisualizer';
+import { useAudioNarrator } from '../hooks/useAudioNarrator';
 
 interface FrequencyReportProps {
   userData: { name: string; birthDate: string };
@@ -12,13 +13,11 @@ interface FrequencyReportProps {
 
 export const FrequencyReport: React.FC<FrequencyReportProps> = ({ userData }) => {
   const [report, setReport] = useState<string | null>(null);
+  const [dailyResonance, setDailyResonance] = useState<string | null>(null);
+  const [view, setView] = useState<'daily' | 'dossier'>('daily');
   const [loading, setLoading] = useState(false);
-  const [audioLoading, setAudioLoading] = useState(false);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [audioBuffer, setAudioBuffer] = useState<AudioBuffer | null>(null);
-  
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const sourceNodeRef = useRef<AudioBufferSourceNode | null>(null);
+  const [dailyLoading, setDailyLoading] = useState(false);
+  const { isPlaying, audioLoading, toggleText, setAudioBuffer } = useAudioNarrator();
   
   const { showToast } = useToast();
 
@@ -26,7 +25,6 @@ export const FrequencyReport: React.FC<FrequencyReportProps> = ({ userData }) =>
     setLoading(true);
     setReport(null);
     setAudioBuffer(null);
-    setIsPlaying(false);
     try {
       const content = await generateFrequencyReport(userData);
       setReport(content);
@@ -38,71 +36,23 @@ export const FrequencyReport: React.FC<FrequencyReportProps> = ({ userData }) =>
     }
   };
 
-  const handleGenerateAudio = async () => {
-    if (!report) return;
-    setAudioLoading(true);
+  const handleGenerateDaily = async () => {
+    setDailyLoading(true);
+    setAudioBuffer(null);
     try {
-      const result = await generateReportAudio(report);
-      
-      // Decode PCM data
-      const binary = atob(result.audioData);
-      const bytes = new Uint8Array(binary.length);
-      for (let i = 0; i < binary.length; i++) {
-        bytes[i] = binary.charCodeAt(i);
-      }
-      
-      // Convert 16-bit Int PCM to Float32 PCM
-      const int16Array = new Int16Array(bytes.buffer);
-      const float32Array = new Float32Array(int16Array.length);
-      for (let i = 0; i < int16Array.length; i++) {
-        float32Array[i] = int16Array[i] / 32768.0;
-      }
-
-      if (!audioContextRef.current) {
-        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
-      }
-      
-      const buffer = audioContextRef.current.createBuffer(1, float32Array.length, 24000);
-      buffer.getChannelData(0).set(float32Array);
-      setAudioBuffer(buffer);
-      
-      showToast('Audio Briefing Ready', 'success');
-      playAudio(buffer);
+      const content = await generateDailyResonance(userData);
+      setDailyResonance(content);
     } catch (error) {
-      console.error("Audio error:", error);
-      showToast('Failed to generate audio', 'error');
+      showToast('Failed to generate daily pulse', 'error');
     } finally {
-      setAudioLoading(false);
+      setDailyLoading(false);
     }
   };
 
-  const playAudio = (buffer: AudioBuffer) => {
-    if (!audioContextRef.current) return;
-    
-    if (sourceNodeRef.current) {
-      sourceNodeRef.current.stop();
-    }
-
-    const source = audioContextRef.current.createBufferSource();
-    source.buffer = buffer;
-    source.connect(audioContextRef.current.destination);
-    source.onended = () => setIsPlaying(false);
-    
-    source.start(0);
-    sourceNodeRef.current = source;
-    setIsPlaying(true);
-  };
-
-  const toggleAudio = () => {
-    if (isPlaying) {
-      if (sourceNodeRef.current) {
-        sourceNodeRef.current.stop();
-        setIsPlaying(false);
-      }
-    } else if (audioBuffer) {
-      playAudio(audioBuffer);
-    } else {
-      handleGenerateAudio();
+  const handleToggleAudio = () => {
+    const textToRead = view === 'daily' ? dailyResonance : report;
+    if (textToRead) {
+      toggleText(textToRead);
     }
   };
 
@@ -110,20 +60,19 @@ export const FrequencyReport: React.FC<FrequencyReportProps> = ({ userData }) =>
     if (!report && !loading) {
       handleGenerateReport();
     }
-    return () => {
-      if (sourceNodeRef.current) {
-        sourceNodeRef.current.stop();
-      }
-    };
+    if (!dailyResonance && !dailyLoading) {
+      handleGenerateDaily();
+    }
   }, [userData]);
 
   const handleDownload = () => {
-    if (!report) return;
-    const blob = new Blob([report], { type: 'text/markdown' });
+    const content = view === 'daily' ? dailyResonance : report;
+    if (!content) return;
+    const blob = new Blob([content], { type: 'text/markdown' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `Frequency_Report_${userData.name.replace(/\s+/g, '_')}.md`;
+    a.download = `Frequency_${view === 'daily' ? 'Daily' : 'Dossier'}_${userData.name.replace(/\s+/g, '_')}.md`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -134,127 +83,216 @@ export const FrequencyReport: React.FC<FrequencyReportProps> = ({ userData }) =>
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
         <div className="flex items-center gap-3">
-          <div className="p-2 sm:p-3 rounded-xl bg-gold/10 text-gold border border-gold/20">
-            <FileText size={20} className="sm:w-6 sm:h-6" />
+          <div className="p-3 rounded-2xl bg-gold/10 text-gold border border-gold/20 shadow-[0_0_15px_rgba(201,168,76,0.1)]">
+            <Activity size={24} className="animate-pulse" />
           </div>
           <div>
-            <h2 className="font-display text-xl sm:text-2xl text-white tracking-widest uppercase">Frequency Report</h2>
-            <p className="text-[8px] sm:text-[10px] text-zinc-500 uppercase tracking-widest">Comprehensive Multi-Dimensional Analysis</p>
+            <h2 className="font-display text-2xl text-white tracking-widest uppercase">Frequency Briefing</h2>
+            <p className="text-[10px] text-zinc-500 uppercase tracking-widest">Quantum State: Synchronized</p>
           </div>
         </div>
         
-        <div className="flex flex-wrap gap-2 self-end sm:self-auto">
+        <div className="flex flex-wrap items-center gap-3 self-end sm:self-auto">
+          {/* Toggle View */}
+          <div className="flex bg-black/40 p-1 rounded-xl border border-white/5">
+            <button 
+              onClick={() => setView('daily')}
+              className={`px-4 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all ${
+                view === 'daily' ? 'bg-gold text-black' : 'text-zinc-500 hover:text-zinc-300'
+              }`}
+            >
+              Daily Pulse
+            </button>
+            <button 
+              onClick={() => setView('dossier')}
+              className={`px-4 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all ${
+                view === 'dossier' ? 'bg-gold text-black' : 'text-zinc-500 hover:text-zinc-300'
+              }`}
+            >
+              Full Dossier
+            </button>
+          </div>
+
+          <div className="h-8 w-px bg-white/10 hidden md:block" />
+
           <button 
-            onClick={toggleAudio}
-            disabled={loading || audioLoading || !report}
-            className={`flex items-center gap-2 px-4 py-2 rounded-full border transition-all text-[10px] uppercase tracking-widest font-bold ${
+            onClick={handleToggleAudio}
+            disabled={loading || dailyLoading || audioLoading || (view === 'daily' ? !dailyResonance : !report)}
+            className={`flex items-center gap-2 px-6 py-2 rounded-xl border transition-all text-[10px] uppercase tracking-widest font-bold ${
               isPlaying 
-              ? 'bg-gold text-black border-gold' 
+              ? 'bg-gold text-black border-gold shadow-[0_0_20px_rgba(201,168,76,0.3)]' 
               : 'bg-gold/10 text-gold border-gold/20 hover:bg-gold/20'
             } disabled:opacity-50`}
           >
             {audioLoading ? <Loader2 size={14} className="animate-spin" /> : isPlaying ? <Pause size={14} /> : <Play size={14} />}
-            {isPlaying ? 'Stop Briefing' : 'Listen to Briefing'}
+            {isPlaying ? 'Stop' : 'Briefing'}
           </button>
           
           <button 
-            onClick={handleGenerateReport}
-            disabled={loading}
-            className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 text-[10px] text-zinc-400 uppercase tracking-widest hover:bg-white/10 transition-all disabled:opacity-50"
-          >
-            {loading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-            Regenerate
-          </button>
-          <button 
             onClick={handleDownload}
-            disabled={!report || loading}
-            className="flex items-center gap-2 px-4 py-2 rounded-full bg-gold text-black text-[10px] font-bold uppercase tracking-widest hover:scale-105 transition-all disabled:opacity-50"
+            disabled={(view === 'daily' ? !dailyResonance : !report) || loading || dailyLoading}
+            className="flex items-center gap-2 px-6 py-2 rounded-xl bg-gold text-black text-[10px] font-bold uppercase tracking-widest hover:scale-105 transition-all disabled:opacity-50 shadow-[0_0_20px_rgba(201,168,76,0.2)]"
           >
             <Download size={14} />
-            Download MD
+            MD
           </button>
         </div>
       </div>
 
       <AnimatePresence mode="wait">
-        {loading ? (
+        {(view === 'daily' ? dailyLoading : loading) ? (
           <motion.div 
             key="loading"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="glass-panel p-12 rounded-3xl border border-white/5 flex flex-col items-center justify-center text-center space-y-6"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 1.05 }}
+            className="glass-panel p-20 rounded-[3rem] border border-white/5 flex flex-col items-center justify-center text-center space-y-8 min-h-[400px]"
           >
             <div className="relative">
-              <div className="w-20 h-20 rounded-full border-2 border-gold/20 animate-spin border-t-gold" />
-              <Sparkles className="absolute inset-0 m-auto text-gold animate-pulse" size={32} />
+              <div className="w-24 h-24 rounded-full border-2 border-gold/10 animate-[spin_3s_linear_infinite] border-t-gold shadow-[0_0_30px_rgba(201,168,76,0.1)]" />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <Sparkles className="text-gold animate-pulse" size={40} />
+              </div>
             </div>
-            <div>
-              <h3 className="text-white font-display text-xl uppercase tracking-widest mb-2">Decoding Frequencies</h3>
-              <p className="text-zinc-500 text-xs uppercase tracking-widest">Synthesizing celestial and numerical data points...</p>
+            <div className="max-w-xs space-y-2">
+              <h3 className="text-white font-display text-2xl uppercase tracking-[0.3em]">Calibrating</h3>
+              <p className="text-zinc-500 text-[10px] uppercase tracking-widest leading-relaxed">Synthesizing multi-dimensional data streams for {view === 'daily' ? 'today\'s resonance' : 'full dossier'}...</p>
             </div>
           </motion.div>
-        ) : report ? (
+        ) : (view === 'daily' && dailyResonance) || (view === 'dossier' && report) ? (
           <motion.div 
-            key="report"
-            initial={{ opacity: 0, y: 20 }}
+            key={view}
+            initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
-            className="glass-panel p-8 sm:p-12 rounded-[3rem] border border-gold/20 relative overflow-hidden cyber-grid"
+            className="glass-panel p-8 sm:p-16 rounded-[4rem] border border-gold/20 relative overflow-hidden"
           >
-            <div className="scan-line" />
-            <div className="absolute top-0 right-0 p-8 flex gap-2">
-              <div className="glow-dot animate-pulse" />
-              <div className="glow-dot animate-pulse delay-75" />
-              <div className="glow-dot animate-pulse delay-150" />
-            </div>
-            
-            <div className="absolute top-0 left-0 w-full h-1 gold-gradient opacity-30" />
+            <div className="absolute inset-0 cyber-grid opacity-10 pointer-events-none" />
             
             <div className="relative z-10">
-              <div className="flex items-center justify-between mb-12 pb-6 border-b border-white/5">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-full border border-gold/30 flex items-center justify-center text-gold">
-                    <Sparkles size={24} />
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12 pb-8 border-b border-white/10">
+                <div className="flex items-center gap-6">
+                  <div className="w-16 h-16 rounded-3xl bg-gold/5 border border-gold/20 flex items-center justify-center text-gold shadow-[inset_0_0_20px_rgba(201,168,76,0.1)]">
+                    {view === 'daily' ? <Calendar size={32} /> : <FileText size={32} />}
                   </div>
                   <div>
-                    <h3 className="text-white font-display text-lg uppercase tracking-[0.3em]">Frequency Dossier</h3>
-                    <p className="text-[8px] text-zinc-500 uppercase tracking-widest">ID: {userData.name.toUpperCase().replace(/\s/g, '-')}-{new Date().getFullYear()}</p>
+                    <h3 className="text-white font-display text-2xl py-1 uppercase tracking-[0.4em] gold-gradient bg-clip-text text-transparent">
+                      {view === 'daily' ? 'Daily Pulse' : 'Frequency Dossier'}
+                    </h3>
+                    <div className="flex items-center gap-3">
+                      <p className="text-[10px] text-zinc-500 uppercase tracking-[0.2em] font-medium">Subject: {userData.name}</p>
+                      <div className="w-1 h-1 rounded-full bg-gold/40" />
+                      <p className="text-[10px] text-gold/60 uppercase tracking-[0.2em]">{new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
+                    </div>
                   </div>
                 </div>
 
-                {audioBuffer && !isPlaying && (
-                  <motion.div 
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="flex items-center gap-2 text-gold/40 text-[8px] uppercase tracking-widest"
+                <div className="flex gap-2">
+                  <button 
+                    onClick={view === 'daily' ? handleGenerateDaily : handleGenerateReport}
+                    className="p-3 rounded-2xl bg-white/5 border border-white/10 text-zinc-500 hover:text-gold hover:border-gold/30 transition-all group"
+                    title="Refresh Analysis"
                   >
-                    <Volume2 size={12} />
-                    Audio Briefing Cached
-                  </motion.div>
-                )}
+                    <RefreshCw size={18} className="group-hover:rotate-180 transition-transform duration-700" />
+                  </button>
+                </div>
               </div>
 
-              <div className="mb-12 p-6 rounded-2xl bg-black/40 border border-gold/10 relative overflow-hidden">
-                <div className="absolute inset-0 opacity-10 cyber-grid" />
-                <p className="text-[8px] uppercase tracking-widest text-gold/60 mb-4 text-center">Spectral Signature Analysis</p>
-                <FrequencyVisualizer name={userData.name} birthDate={userData.birthDate} />
-              </div>
+              {view === 'daily' ? (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-start">
+                  <div className="space-y-8">
+                    <div className="markdown-body prose prose-invert prose-gold max-w-none prose-headings:font-display prose-headings:tracking-[0.2em] prose-headings:uppercase prose-p:text-zinc-400 prose-p:leading-relaxed prose-strong:text-gold">
+                      <Markdown>{dailyResonance}</Markdown>
+                    </div>
+                    
+                    <div className="flex flex-wrap gap-4 pt-4">
+                      <div className="flex-1 min-w-[200px] p-6 rounded-3xl bg-white/5 border border-white/10 flex flex-col gap-3">
+                        <div className="flex items-center gap-2 text-gold">
+                          <Zap size={16} />
+                          <span className="text-[10px] font-bold uppercase tracking-widest">Active Influence</span>
+                        </div>
+                        <p className="text-sm text-white font-medium">Jupiter Sextile Ascendant</p>
+                        <p className="text-[10px] text-zinc-500 leading-relaxed uppercase tracking-wider">Amplified expansion in personal outreach. High probability of synchronicities.</p>
+                      </div>
+                      <div className="flex-1 min-w-[200px] p-6 rounded-3xl bg-gold/10 border border-gold/20 flex flex-col gap-3 shadow-[0_10px_30px_rgba(201,168,76,0.05)]">
+                        <div className="flex items-center gap-2 text-gold">
+                          <Target size={16} />
+                          <span className="text-[10px] font-bold uppercase tracking-widest">Strategic Focus</span>
+                        </div>
+                        <p className="text-sm text-white font-medium">Network Expansion</p>
+                        <p className="text-[10px] text-zinc-500 leading-relaxed uppercase tracking-wider">Deploy new initiatives between 2 PM and 4 PM. Vibration is peaked for impact.</p>
+                      </div>
+                    </div>
+                  </div>
 
-              <div className="markdown-body prose prose-invert prose-gold max-w-none prose-headings:font-display prose-headings:tracking-[0.2em] prose-headings:uppercase prose-h1:text-3xl prose-h2:text-2xl prose-h3:text-xl prose-p:text-zinc-400 prose-strong:text-gold prose-li:text-zinc-400">
-                <Markdown>{report}</Markdown>
-              </div>
+                  <div className="sticky top-8 space-y-8">
+                    <div className="p-8 rounded-[2.5rem] bg-black/40 border border-gold/10 relative overflow-hidden group">
+                      <div className="absolute inset-0 opacity-10 cyber-grid group-hover:opacity-20 transition-opacity" />
+                      <div className="relative z-10">
+                        <div className="flex items-center justify-between mb-8">
+                          <div className="flex items-center gap-2">
+                            <Activity className="text-gold" size={16} />
+                            <h4 className="text-[10px] uppercase tracking-widest text-gold/80 font-bold">Real-time Spectral Output</h4>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                            <span className="text-[8px] text-emerald-500/80 uppercase tracking-widest font-bold">Live</span>
+                          </div>
+                        </div>
+                        <FrequencyVisualizer name={userData.name} birthDate={userData.birthDate} />
+                        <div className="mt-8 pt-8 border-t border-white/5 grid grid-cols-3 gap-4 text-center">
+                          <div>
+                            <p className="text-[8px] text-zinc-600 uppercase tracking-widest mb-1">Stability</p>
+                            <p className="text-xs text-white font-mono">98.4%</p>
+                          </div>
+                          <div>
+                            <p className="text-[8px] text-zinc-600 uppercase tracking-widest mb-1">Amplitude</p>
+                            <p className="text-xs text-white font-mono">0.65</p>
+                          </div>
+                          <div>
+                            <p className="text-[8px] text-zinc-600 uppercase tracking-widest mb-1">Phase</p>
+                            <p className="text-xs text-white font-mono">Balanced</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="p-8 rounded-[2.5rem] bg-gold/5 border border-gold/10 text-center space-y-4">
+                      <p className="text-[9px] uppercase tracking-[0.3em] text-gold/60">Optimized Today For:</p>
+                      <div className="flex flex-wrap justify-center gap-2">
+                        {['Clarity', 'Action', 'Synthesis'].map(tag => (
+                          <span key={tag} className="px-4 py-1.5 rounded-full bg-black/40 border border-gold/20 text-gold text-[8px] font-bold uppercase tracking-widest">
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="max-w-4xl mx-auto">
+                  <div className="mb-12 p-8 sm:p-12 rounded-[2.5rem] bg-black/40 border border-gold/10 relative overflow-hidden">
+                    <div className="absolute inset-0 opacity-5 cyber-grid" />
+                    <p className="text-[10px] uppercase tracking-[0.4em] text-gold/60 mb-6 text-center font-bold">Spectral Signature Analysis</p>
+                    <FrequencyVisualizer name={userData.name} birthDate={userData.birthDate} />
+                  </div>
+
+                  <div className="markdown-body prose prose-invert prose-gold max-w-none prose-headings:font-display prose-headings:tracking-[0.2em] prose-headings:uppercase prose-h1:text-4xl prose-h1:gold-gradient prose-h1:bg-clip-text prose-h1:text-transparent prose-h2:text-2xl prose-h3:text-xl prose-p:text-zinc-400 prose-p:leading-relaxed prose-strong:text-gold prose-li:text-zinc-400">
+                    <Markdown>{report}</Markdown>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Decorative Signal Bars */}
-            <div className="mt-12 flex justify-center gap-1 h-4 items-end opacity-20">
-              {Array.from({ length: 40 }).map((_, i) => (
+            <div className="mt-16 flex justify-center gap-1.5 h-6 items-end opacity-20">
+              {Array.from({ length: 60 }).map((_, i) => (
                 <motion.div
                   key={i}
-                  animate={{ height: isPlaying ? [4, 16, 6, 12, 4] : 4 }}
-                  transition={{ duration: 0.5, repeat: isPlaying ? Infinity : 0, delay: i * 0.05 }}
-                  className="w-0.5 bg-gold rounded-full"
+                  animate={{ height: isPlaying ? [6, 24, 8, 18, 6] : 6 }}
+                  transition={{ duration: 0.6, repeat: isPlaying ? Infinity : 0, delay: i * 0.03 }}
+                  className="w-1 bg-gold rounded-full"
                 />
               ))}
             </div>

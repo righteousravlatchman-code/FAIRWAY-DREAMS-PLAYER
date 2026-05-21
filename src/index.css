@@ -2,29 +2,120 @@
 
 :root {
   --bg-color: #050505;
-  --text-primary: #e8e8e8;
-  --text-secondary: #a1a1aa;
+  --header-bg: var(--bg-color);
+  --footer-bg: #000000;
+  --text-primary: #f0f0f0; /* Slightly brighter */
+  --text-secondary: #d1d1d6; /* Much brighter than a1a1aa */
   --panel-bg: rgba(255, 255, 255, 0.03);
   --panel-border: rgba(255, 255, 255, 0.08);
   --surface: #0a0a0a;
   --gold: var(--primary, #c9a84c);
   --shadow: 0 10px 30px -10px rgba(0,0,0,0.5);
   
-  --primary: #c9a84c;
+  --primary: #d4b76a; /* Brighter gold */
   --secondary: #8a6a1e;
   --accent: #f0d080;
   --glow: rgba(201, 168, 76, 0.5);
 }
 
 .light {
-  --bg-color: #fcfcfc;
-  --text-primary: #121212;
-  --text-secondary: #475569;
-  --panel-bg: rgba(255, 255, 255, 0.8);
+  --bg-color: #f5f5dc; /* Cream */
+  --header-bg: #000000; /* Black Header */
+  --footer-bg: #000000; /* Black Footer */
+  --text-primary: #000000; /* Black */
+  --text-secondary: #000000; /* Pure black */
+  --panel-bg: rgba(255, 255, 255, 0.7);
   --panel-border: rgba(0, 0, 0, 0.1);
   --surface: #ffffff;
-  --gold: #8a6a1e;
-  --shadow: 0 10px 40px -12px rgba(0,0,0,0.08);
+  --gold: #000000; 
+  --shadow: 0 10px 40px -12px rgba(0, 0, 0, 0.1);
+}
+
+.light nav {
+  --text-primary: #ffffff !important;
+  --text-secondary: #ffffff !important; /* Pure white in black header */
+  --primary: #d4b76a !important; /* Brighter Gold for Header */
+}
+
+.light nav .text-gold {
+  color: #d4b76a !important;
+}
+
+.light nav .text-zinc-600 {
+  color: #d4d4d8 !important; /* Brighter in black header */
+}
+
+.light nav .text-zinc-500 {
+  color: #a1a1aa !important; /* Brighter in black header */
+}
+
+/* Harder-to-read small headings in light mode */
+.light .text-zinc-500 { color: #000000 !important; }
+.light .text-zinc-400 { color: #000000 !important; }
+.light .text-orange-400 { color: #c2410c !important; } /* orange-700 - keeping some color but very dark */
+.light .text-emerald-400 { color: #047857 !important; } /* emerald-700 */
+.light .text-lime-400 { color: #4d7c0f !important; } /* lime-700 */
+.light .text-amber-400 { color: #b45309 !important; } /* amber-700 */
+.light .text-zinc-600 { color: #000000 !important; }
+
+/* Fix markdown readability specifically in light mode when prose-invert is used */
+.light .prose-invert {
+  --tw-prose-body: #404040;
+  --tw-prose-headings: #000000;
+  --tw-prose-lead: #525252;
+  --tw-prose-links: #000000;
+  --tw-prose-bold: #000000;
+  --tw-prose-counters: #71717a;
+  --tw-prose-bullets: #a1a1aa;
+  --tw-prose-hr: #e4e4e7;
+  --tw-prose-quotes: #18181b;
+  --tw-prose-quote-borders: #e4e4e7;
+  --tw-prose-captions: #71717a;
+  --tw-prose-code: #000000;
+  --tw-prose-pre-code: #e4e4e7;
+  --tw-prose-pre-bg: #18181b;
+  --tw-prose-th-borders: #d4d4d8;
+  --tw-prose-td-borders: #e4e4e7;
+}
+
+.light .text-white {
+  color: var(--text-primary) !important;
+}
+
+.light .bg-black .text-white,
+.light .bg-black .text-zinc-500,
+.light .bg-black .text-zinc-600,
+.light footer.bg-black .text-white,
+.light footer.bg-black button,
+.light footer.bg-black span,
+.light footer.bg-black p,
+.light .bg-[#050505] .text-white,
+.light .bg-[#050505].text-white,
+.light .bg-[#0a0a0a] .text-white,
+.light .bg-[#0a0a0a].text-white,
+.light .bg-zinc-950 .text-white,
+.light .bg-zinc-950.text-white,
+.light .bg-zinc-900 .text-white,
+.light .bg-zinc-900.text-white,
+.light .bg-zinc-800 .text-white,
+.light .bg-zinc-800.text-white,
+.light .gold-gradient .text-white,
+.light .gold-gradient.text-white,
+.light .bg-gold .text-white,
+.light .bg-gold.text-white,
+.light .bg-emerald-500 .text-white,
+.light .bg-emerald-500.text-white,
+.light .bg-red-500 .text-white,
+.light .bg-red-500.text-white,
+.light .bg-blue-500 .text-white,
+.light .bg-blue-500.text-white {
+  color: #ffffff !important;
+}
+
+.light .bg-black .text-zinc-500,
+.light footer.bg-black button,
+.light footer.bg-black p {
+  color: #ffffff !important;
 }
 
 @theme {
@@ -156,6 +247,10 @@
     background: var(--primary);
     border-radius: 50%;
     box-shadow: 0 0 10px var(--primary);
+  }
+
+  .hover-zoom {
+    @apply transition-transform duration-300 hover:scale-105;
   }
 }
 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence, useScroll, useTransform } from 'motion/react';
-import { Music, Drone, Info, ShieldCheck, Mail, Menu, X, ChevronRight, Sparkles, Save, LogIn, LogOut, User as UserIcon, Megaphone, Sun, Moon, BookOpen, Shield, Layout, Play, Radio, Users, FileText, HelpCircle, Settings, Compass, Star } from 'lucide-react';
+import { Music, Drone, Info, ShieldCheck, Mail, Menu, X, ChevronRight, Sparkles, Save, LogIn, LogOut, User as UserIcon, Megaphone, Sun, Moon, BookOpen, Shield, Layout, Play, Radio, Users, FileText, HelpCircle, Settings, Compass, Star, ExternalLink, ShoppingBag } from 'lucide-react';
 import { Track, VisualizerMode, ThemeColors, MediaItem, VisualizerSettings } from './types';
 import { TRACKS, THEMES } from './constants';
 import { useAudioPlayer } from './hooks/useAudioPlayer';
@@ -25,12 +25,15 @@ import { FrequencyReport } from './components/FrequencyReport';
 import { UnifiedIntake } from './components/UnifiedIntake';
 import { ProfileView } from './components/ProfileView';
 import { AdminDashboard } from './components/AdminDashboard';
+import { MerchStore } from './components/MerchStore';
+import { StoreCart } from './components/StoreCart';
 import { LiveStage } from './components/LiveStage';
 import { ToolGuide } from './components/ToolGuide';
 import { MilitaryDroneBackground } from './components/MilitaryDroneBackground';
+import { ArtistsView } from './components/ArtistsView';
 import { getHebrewName } from './services/geminiService';
 import { GoogleGenAI } from "@google/genai";
-import { UserProfile, SavedInsight, Playlist, ListeningEvent } from './types';
+import { UserProfile, SavedInsight, Playlist, ListeningEvent, Product, CartItem } from './types';
 import { 
   auth, 
   db, 
@@ -104,6 +107,8 @@ export default function App() {
   const [tracks, setTracks] = useState<Track[]>(TRACKS);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [listeningHistory, setListeningHistory] = useState<ListeningEvent[]>([]);
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [isCartOpen, setIsCartOpen] = useState(false);
   const { showToast } = useToast();
 
   // Auth Listener
@@ -154,7 +159,7 @@ export default function App() {
 
   // Theme Sync
   useEffect(() => {
-    if (profile.settings.theme === 'light') {
+    if (profile.settings.theme === 'light' || profile.settings.theme === 'day') {
       document.documentElement.classList.add('light');
     } else {
       document.documentElement.classList.remove('light');
@@ -439,6 +444,41 @@ Plant conceptual seeds now for action in his next personal year. Present thought
     }
   }, []);
 
+  const handleAddToPlaylist = useCallback(async (playlistId: string, trackId: string) => {
+    const playlist = playlists.find(p => p.id === playlistId);
+    if (!playlist) return;
+    
+    if (playlist.trackIds.includes(trackId)) {
+      showToast('Track already in vault', 'info');
+      return;
+    }
+
+    try {
+      await updateDoc(doc(db, 'playlists', playlistId), {
+        trackIds: [...playlist.trackIds, trackId],
+        updatedAt: new Date().toISOString()
+      });
+      showToast('Track added to vault', 'success');
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `playlists/${playlistId}`);
+    }
+  }, [playlists, showToast]);
+
+  const handleRemoveFromPlaylist = useCallback(async (playlistId: string, trackId: string) => {
+    const playlist = playlists.find(p => p.id === playlistId);
+    if (!playlist) return;
+
+    try {
+      await updateDoc(doc(db, 'playlists', playlistId), {
+        trackIds: playlist.trackIds.filter(id => id !== trackId),
+        updatedAt: new Date().toISOString()
+      });
+      showToast('Track removed from vault', 'success');
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `playlists/${playlistId}`);
+    }
+  }, [playlists, showToast]);
+
   const handleSignIn = async () => {
     try {
       await signInWithPopup(auth, googleProvider);
@@ -446,6 +486,56 @@ Plant conceptual seeds now for action in his next personal year. Present thought
     } catch (error) {
       console.error("Sign in error:", error);
     }
+  };
+
+  const handleAddToCart = (product: Product, size?: string, color?: string) => {
+    setCart(prev => {
+      const existing = prev.find(item => 
+        item.id === product.id && 
+        item.selectedSize === size && 
+        item.selectedColor === color
+      );
+
+      if (existing) {
+        return prev.map(item => 
+          item.id === product.id && 
+          item.selectedSize === size && 
+          item.selectedColor === color
+            ? { ...item, quantity: item.quantity + 1 }
+            : item
+        );
+      }
+
+      return [...prev, { ...product, quantity: 1, selectedSize: size, selectedColor: color }];
+    });
+    showToast('Artifact added to collection', 'success');
+  };
+
+  const handleRemoveFromCart = (productId: string, size?: string, color?: string) => {
+    setCart(prev => prev.filter(item => 
+      !(item.id === productId && 
+        item.selectedSize === size && 
+        item.selectedColor === color)
+    ));
+  };
+
+  const handleUpdateCartQuantity = (productId: string, delta: number, size?: string, color?: string) => {
+    setCart(prev => prev.map(item => 
+      item.id === productId && 
+      item.selectedSize === size && 
+      item.selectedColor === color
+        ? { ...item, quantity: Math.max(1, item.quantity + delta) }
+        : item
+    ));
+  };
+
+  const handleCheckout = () => {
+    showToast('Transaction protocol initiated...', 'info');
+    setTimeout(() => {
+      setCart([]);
+      setIsCartOpen(false);
+      showToast('Artifacts secured. Check your email for frequency codes.', 'success');
+    }, 2000);
   };
 
   const handleSignOut = async () => {
@@ -653,7 +743,7 @@ Plant conceptual seeds now for action in his next personal year. Present thought
     >
       <MilitaryDroneBackground />
       {/* Navigation */}
-      <nav className="fixed top-0 left-0 right-0 z-[70] bg-[var(--bg-color)]/80 backdrop-blur-xl border-b border-[var(--panel-border)]">
+      <nav className="fixed top-0 left-0 right-0 z-[70] bg-[var(--header-bg)]/80 backdrop-blur-xl border-b border-[var(--panel-border)]">
         <div className="absolute bottom-0 left-0 w-full flex gap-0.5 h-0.5 items-end opacity-20">
           {Array.from({ length: 150 }).map((_, i) => (
             <motion.div
@@ -689,8 +779,8 @@ Plant conceptual seeds now for action in his next personal year. Present thought
           </div>
 
           {/* Desktop Nav */}
-          <div className="hidden md:flex items-center gap-6">
-            {['home', 'player', 'live', 'oracle', 'personnel', 'music', 'about', 'tools', 'mission', 'circle', 'licensing', 'faq', ...(profile.role === 'admin' ? ['admin', 'crm'] : [])].map((tab) => (
+          <div className="hidden md:flex items-center gap-6 overflow-x-auto custom-scrollbar pb-2 pt-2">
+            {['home', 'player', 'live', 'store', 'oracle', 'personnel', 'music', 'artists', 'about', 'tools', 'mission', 'circle', 'licensing', 'faq', ...(profile.role === 'admin' ? ['admin', 'crm'] : [])].map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -808,7 +898,9 @@ Plant conceptual seeds now for action in his next personal year. Present thought
                 { id: 'oracle', name: 'Quantum Oracle', icon: <Sparkles size={20} /> },
                 { id: 'personnel', name: 'Personnel', icon: <Users size={20} /> },
                 { id: 'live', name: 'Live Stage', icon: <Radio size={20} className="text-red-500 animate-pulse" /> },
+                { id: 'store', name: 'Artifact Store', icon: <ShoppingBag size={20} /> },
                 { id: 'music', name: 'Signals', icon: <Radio size={20} /> },
+                { id: 'artists', name: 'Artists', icon: <Star size={20} /> },
                 { id: 'tools', name: 'Frequency Tools', icon: <Compass size={20} /> },
                 { id: 'mission', name: 'Mission Control', icon: <Shield size={20} /> },
                 { id: 'circle', name: 'Community', icon: <Users size={20} /> },
@@ -896,9 +988,9 @@ Plant conceptual seeds now for action in his next personal year. Present thought
                   <img 
                     src="https://cdn2.suno.ai/30a77b97-fefe-42e9-bac2-64928fd1fec9.jpeg" 
                     alt="Avatar" 
-                    className="w-20 h-20 sm:w-24 sm:h-24 md:w-32 md:h-32 rounded-full border-2 border-gold mx-auto mb-6 md:mb-8 shadow-2xl shadow-gold/20"
+                    className="w-20 h-20 sm:w-24 sm:h-24 md:w-32 md:h-32 rounded-full border-2 border-gold mx-auto mb-6 md:mb-8 shadow-2xl shadow-gold/20 hover-zoom"
                   />
-                  <p className="text-gold text-[7px] sm:text-[8px] md:text-[10px] uppercase tracking-[0.3em] sm:tracking-[0.5em] mb-4">AI-Generated Music · Suno · @fairwaydreams</p>
+                  <p className="text-[var(--text-primary)] text-[7px] sm:text-[8px] md:text-[10px] uppercase tracking-[0.3em] sm:tracking-[0.5em] mb-4">AI-Generated Music · Suno · @fairwaydreams</p>
                   <h1 className="font-display text-responsive-h1 tracking-tighter mb-4 md:mb-6 bg-gradient-to-b from-[var(--text-primary)] to-zinc-500 bg-clip-text text-transparent px-4">
                     FAIRWAY DREAMS
                   </h1>
@@ -979,11 +1071,13 @@ Plant conceptual seeds now for action in his next personal year. Present thought
                 theme={activeTheme}
                 themeName={vizSettings.themeName}
                 isFavorite={(profile.likedTrackIds || []).includes(currentTrack.id)}
+                playlists={playlists.filter(p => p.userId === user?.uid || profile.role === 'admin')}
                 onTogglePlay={() => togglePlay(currentTrack.mediaUrl)}
                 onPrev={handlePrev}
                 onNext={handleNext}
                 onSeek={seek}
                 onVolumeChange={updateVolume}
+                onAddToPlaylist={handleAddToPlaylist}
                 onSettingsChange={(s) => {
                   setVizSettings(s);
                   updateProfile({ settings: { ...profile.settings, vizSettings: s } });
@@ -1008,8 +1102,10 @@ Plant conceptual seeds now for action in his next personal year. Present thought
                 tracks={tracks}
                 currentTrackId={currentTrack.id}
                 likedTrackIds={profile.likedTrackIds || []}
+                playlists={playlists.filter(p => p.userId === user?.uid || profile.role === 'admin')}
                 onSelect={handleTrackSelect}
                 onToggleFavorite={toggleFavorite}
+                onAddToPlaylist={handleAddToPlaylist}
               />
             </motion.div>
           )}
@@ -1026,6 +1122,24 @@ Plant conceptual seeds now for action in his next personal year. Present thought
                 currentTrack={currentTrack} 
                 user={user} 
                 profile={profile} 
+              />
+            </motion.div>
+          )}
+
+          {activeTab === 'store' && (
+            <motion.div 
+              key="store" 
+              initial={{ opacity: 0 }} 
+              animate={{ opacity: 1 }} 
+              exit={{ opacity: 0 }}
+            >
+              <MerchStore 
+                theme={activeTheme}
+                cart={cart}
+                onAddToCart={handleAddToCart}
+                onRemoveFromCart={handleRemoveFromCart}
+                onUpdateQuantity={handleUpdateCartQuantity}
+                onOpenCart={() => setIsCartOpen(true)}
               />
             </motion.div>
           )}
@@ -1055,6 +1169,8 @@ Plant conceptual seeds now for action in his next personal year. Present thought
                 onCreatePlaylist={handleCreatePlaylist}
                 onDeletePlaylist={handleDeletePlaylist}
                 onUpdatePlaylist={handleUpdatePlaylist}
+                onAddToPlaylist={handleAddToPlaylist}
+                onRemoveFromPlaylist={handleRemoveFromPlaylist}
                 tracks={tracks}
               />
             </motion.div>
@@ -1132,21 +1248,35 @@ Plant conceptual seeds now for action in his next personal year. Present thought
                     const matchesGenre = selectedGenre === 'All' || track.genre.includes(selectedGenre);
                     return matchesSearch && matchesGenre;
                   }).map((track) => (
-                    <motion.a
+                    <motion.div
                       key={track.id}
-                      href={track.url}
-                      target="_blank"
                       whileHover={{ y: -10 }}
-                      className="group glass-panel rounded-2xl overflow-hidden block"
+                      className="group glass-panel rounded-2xl overflow-hidden cursor-pointer"
+                      onClick={() => handleTrackSelect(track)}
                     >
                       <div className="relative aspect-square overflow-hidden">
-                        <img src={track.art} alt={track.title} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
-                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                          <span className="px-6 py-2 rounded-full border border-gold text-gold text-[10px] uppercase tracking-widest">Stream Now</span>
+                        <img src={track.art || '/src/assets/images/default_cover_1779345608057.png'} alt={track.title} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" referrerPolicy="no-referrer" />
+                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-3">
+                          <div className="w-12 h-12 rounded-full bg-gold/20 border border-gold/50 flex items-center justify-center backdrop-blur-sm">
+                            <Play size={20} className="text-gold fill-gold ml-1" />
+                          </div>
+                          <span className="px-6 py-2 rounded-full border border-gold text-gold text-[10px] uppercase tracking-widest bg-black/40">Play Now</span>
                         </div>
                       </div>
                       <div className="p-6">
-                        <h3 className="font-display text-sm text-[var(--text-primary)] tracking-widest mb-2">{track.title}</h3>
+                        <div className="flex justify-between items-start gap-2 mb-2">
+                          <h3 className="font-display text-sm text-[var(--text-primary)] tracking-widest truncate">{track.title}</h3>
+                          <a 
+                            href={track.url} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="p-1.5 rounded-lg bg-white/5 hover:bg-gold/20 text-zinc-500 hover:text-gold transition-colors"
+                            title="Open on Suno"
+                          >
+                            <ExternalLink size={12} />
+                          </a>
+                        </div>
                         <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-4">{track.genre.join(' · ')}</p>
                         
                         <div className="flex items-center justify-between">
@@ -1166,7 +1296,7 @@ Plant conceptual seeds now for action in his next personal year. Present thought
                           </div>
                         </div>
                       </div>
-                    </motion.a>
+                    </motion.div>
                   ))
                 )}
               </div>
@@ -1475,12 +1605,23 @@ Plant conceptual seeds now for action in his next personal year. Present thought
                   { q: 'How is the music created?', a: 'Using Suno AI with intentional prompts based on GG33 frameworks, Monroe Institute Hemi-Sync concepts, and astrological alignments.' },
                   { q: 'What are the influences?', a: 'The system is built on GG33, Dolores Cannon, Carl Jung, the Monroe Institute, Nostradamus, and Mystic Rebels Astrology.' }
                 ].map((item, i) => (
-                  <div key={i} className="glass-panel p-6 rounded-2xl border border-white/5">
+                  <div key={i} className="glass-panel p-6 rounded-2xl border border-white/5 hover-zoom">
                     <h4 className="text-[var(--text-primary)] font-bold text-sm mb-2 uppercase tracking-wide">{item.q}</h4>
                     <p className="text-[var(--text-secondary)] text-xs leading-relaxed">{item.a}</p>
                   </div>
                 ))}
               </div>
+            </motion.div>
+          )}
+
+          {activeTab === 'artists' && (
+            <motion.div
+              key="artists"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+            >
+              <ArtistsView onSelectTrack={handleTrackSelect} />
             </motion.div>
           )}
 
@@ -1503,7 +1644,7 @@ Plant conceptual seeds now for action in his next personal year. Present thought
               exit={{ opacity: 0 }}
               className="max-w-4xl mx-auto px-4 md:px-6 py-12"
             >
-              <div className="glass-panel rounded-[2rem] md:rounded-[3rem] p-8 md:p-20 text-center relative overflow-hidden">
+              <div className="glass-panel rounded-[2rem] md:rounded-[3rem] p-8 md:p-20 text-center relative overflow-hidden hover-zoom transition-transform duration-500">
                 <div className="absolute top-0 left-0 w-full h-1 gold-gradient" />
                 <p className="text-gold text-[10px] uppercase tracking-[0.5em] mb-6">Inner Circle</p>
                 <h2 className="font-display text-3xl md:text-6xl text-[var(--text-primary)] tracking-widest mb-6 md:mb-8">Get Exclusive Drops</h2>
@@ -1590,8 +1731,18 @@ Plant conceptual seeds now for action in his next personal year. Present thought
         </AnimatePresence>
       </main>
 
+      <StoreCart 
+        isOpen={isCartOpen}
+        onClose={() => setIsCartOpen(false)}
+        cart={cart}
+        onUpdateQuantity={handleUpdateCartQuantity}
+        onRemoveFromCart={handleRemoveFromCart}
+        onCheckout={handleCheckout}
+        theme={activeTheme}
+      />
+
       {/* Global Footer */}
-      <footer className="border-t border-white/5 py-12 px-6 relative overflow-hidden">
+      <footer className="border-t border-white/5 py-12 px-6 relative overflow-hidden bg-black">
         <div className="absolute top-0 left-0 w-full flex gap-0.5 h-1 items-end opacity-10">
           {Array.from({ length: 200 }).map((_, i) => (
             <motion.div
@@ -1607,18 +1758,18 @@ Plant conceptual seeds now for action in his next personal year. Present thought
             <div className="w-8 h-8 rounded-lg gold-gradient flex items-center justify-center text-black">
               <Drone size={16} />
             </div>
-            <span className="font-display text-sm text-[var(--text-primary)] tracking-widest uppercase">Fairway Dreams</span>
+            <span className="font-display text-sm text-white tracking-widest uppercase">Fairway Dreams</span>
           </div>
           
           <div className="flex gap-8">
             {['home', 'player', 'music', 'about', 'tools', 'guide', 'circle', 'licensing', 'faq', ...(profile.role === 'admin' ? ['admin'] : [])].map(tab => (
-              <button key={tab} onClick={() => setActiveTab(tab)} className="text-[10px] uppercase tracking-widest text-[var(--text-secondary)] hover:text-gold transition-colors">
+              <button key={tab} onClick={() => setActiveTab(tab)} className="text-[10px] uppercase tracking-widest text-white hover:text-gold transition-colors">
                 {tab}
               </button>
             ))}
           </div>
 
-          <p className="text-[10px] text-[var(--text-secondary)] uppercase tracking-widest">
+          <p className="text-[10px] text-white uppercase tracking-widest">
             © 2026 Fairway Dreams · AI Music Studio
           </p>
         </div>

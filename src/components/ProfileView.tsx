@@ -1,12 +1,14 @@
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import ReactMarkdown from 'react-markdown';
-import { User, Heart, BookOpen, Settings, Edit2, Save, X, Music, Sparkles, LogOut, Plus, Lock, Globe, Trash2, Play, Share2, FileText, Download, Upload, Loader2 } from 'lucide-react';
+import { User, Heart, BookOpen, Settings, Edit2, Save, X, Music, Sparkles, LogOut, Plus, Lock, Globe, Trash2, Play, Share2, FileText, Download, Upload, Loader2, Volume2, Pause } from 'lucide-react';
 import { UserProfile, Track, SavedInsight, Playlist, ListeningEvent } from '../types';
 import { TRACKS } from '../constants';
 import { auth, storage, ref, uploadBytes, getDownloadURL } from '../firebase';
 import { RecommendationService } from '../services/recommendationService';
 import { FrequencyVisualizer } from './FrequencyVisualizer';
+import { useAudioNarrator } from '../hooks/useAudioNarrator';
+import { ShareButtons } from './ShareButtons';
 
 interface ProfileViewProps {
   profile: UserProfile;
@@ -17,6 +19,8 @@ interface ProfileViewProps {
   onCreatePlaylist: (name: string, isPublic: boolean) => void;
   onDeletePlaylist: (id: string) => void;
   onUpdatePlaylist: (id: string, updates: Partial<Playlist>) => void;
+  onAddToPlaylist: (playlistId: string, trackId: string) => void;
+  onRemoveFromPlaylist: (playlistId: string, trackId: string) => void;
   tracks: Track[];
 }
 
@@ -29,6 +33,8 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   onCreatePlaylist,
   onDeletePlaylist,
   onUpdatePlaylist,
+  onAddToPlaylist,
+  onRemoveFromPlaylist,
   tracks 
 }) => {
   const [isEditing, setIsEditing] = useState(false);
@@ -41,6 +47,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
     bio: profile.bio,
     avatar: profile.avatar
   });
+  const [editingPlaylistId, setEditingPlaylistId] = useState<string | null>(null);
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -74,6 +81,14 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
     playlists.filter(p => p.userId === profile.uid),
     [playlists, profile.uid]
   );
+
+  const { isPlaying, audioLoading, toggleText } = useAudioNarrator();
+
+  const handleToggleAudio = () => {
+    if (profile.frequencyReport) {
+      toggleText(profile.frequencyReport);
+    }
+  };
 
   const recommendations = useMemo(() => 
     RecommendationService.getRecommendations(tracks, profile, listeningHistory),
@@ -250,8 +265,21 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                   <FileText size={20} className="text-gold" />
                   <h3 className="font-display text-xl text-white tracking-widest uppercase">Frequency Dossier</h3>
                 </div>
-                <button 
-                  onClick={() => {
+                <div className="flex gap-2">
+                  <button 
+                    onClick={handleToggleAudio}
+                    disabled={audioLoading}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-full border transition-all text-[10px] uppercase tracking-widest font-bold ${
+                      isPlaying 
+                      ? 'bg-gold text-black border-gold shadow-[0_0_15px_rgba(201,168,76,0.2)]' 
+                      : 'bg-gold/10 text-gold border-gold/20 hover:bg-gold/20'
+                    }`}
+                  >
+                    {audioLoading ? <Loader2 size={14} className="animate-spin" /> : isPlaying ? <Pause size={14} /> : <Volume2 size={14} />}
+                    {isPlaying ? 'Stop' : 'Briefing'}
+                  </button>
+                  <button 
+                    onClick={() => {
                     const blob = new Blob([profile.frequencyReport || ''], { type: 'text/markdown' });
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement('a');
@@ -268,7 +296,8 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                   <Download size={16} />
                 </button>
               </div>
-              <div className="glass-panel p-8 sm:p-12 rounded-[3rem] border-gold/20 relative overflow-hidden cyber-grid">
+            </div>
+            <div className="glass-panel p-8 sm:p-12 rounded-[3rem] border-gold/20 relative overflow-hidden cyber-grid">
                 <div className="scan-line" />
                 <div className="absolute top-0 right-0 p-8 flex gap-2">
                   <div className="glow-dot animate-pulse" />
@@ -333,7 +362,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                       onClick={() => onSelectTrack(track)}
                       className="glass-panel p-3 rounded-xl flex items-center gap-4 cursor-pointer group"
                     >
-                      <img src={track.art} alt={track.title} className="w-12 h-12 rounded-lg object-cover" />
+                      <img src={track.art || '/src/assets/images/default_cover_1779345608057.png'} alt={track.title} className="w-12 h-12 rounded-lg object-cover" referrerPolicy="no-referrer" />
                       <div className="flex-1 min-w-0">
                         <h5 className="text-white text-xs font-medium truncate">{track.title}</h5>
                         <p className="text-zinc-500 text-[8px] uppercase tracking-widest truncate">{track.genre[0]}</p>
@@ -355,7 +384,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                       onClick={() => onSelectTrack(track)}
                       className="glass-panel p-3 rounded-xl flex items-center gap-4 cursor-pointer group"
                     >
-                      <img src={track.art} alt={track.title} className="w-12 h-12 rounded-lg object-cover" />
+                      <img src={track.art || '/src/assets/images/default_cover_1779345608057.png'} alt={track.title} className="w-12 h-12 rounded-lg object-cover" referrerPolicy="no-referrer" />
                       <div className="flex-1 min-w-0">
                         <h5 className="text-white text-xs font-medium truncate">{track.title}</h5>
                         <p className="text-zinc-500 text-[8px] uppercase tracking-widest truncate">{track.genre[0]}</p>
@@ -443,6 +472,13 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                     </div>
                     <div className="flex gap-2">
                       <button 
+                        onClick={() => setEditingPlaylistId(editingPlaylistId === playlist.id ? null : playlist.id)}
+                        className={`p-2 rounded-lg transition-colors ${editingPlaylistId === playlist.id ? 'bg-gold text-black' : 'bg-white/5 text-zinc-500 hover:text-gold'}`}
+                        title="Edit Contents"
+                      >
+                        <Edit2 size={14} />
+                      </button>
+                      <button 
                         onClick={() => onUpdatePlaylist(playlist.id!, { isPublic: !playlist.isPublic })}
                         className="p-2 rounded-lg bg-white/5 text-zinc-500 hover:text-gold transition-colors"
                       >
@@ -456,29 +492,77 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                       </button>
                     </div>
                   </div>
-                  <h4 className="text-white font-display tracking-widest uppercase mb-1">{playlist.title}</h4>
-                  <p className="text-zinc-500 text-[8px] uppercase tracking-widest">
-                    {playlist.trackIds.length} Tracks • {new Date(playlist.createdAt).toLocaleDateString()}
-                  </p>
-                  
-                  <div className="mt-6 flex -space-x-3">
-                    {playlist.trackIds.slice(0, 3).map((tid, i) => {
-                      const track = tracks.find(t => t.id === tid);
-                      return track ? (
-                        <img 
-                          key={tid} 
-                          src={track.art} 
-                          className="w-8 h-8 rounded-full border-2 border-black object-cover" 
-                          style={{ zIndex: 3 - i }}
-                        />
-                      ) : null;
-                    })}
-                    {playlist.trackIds.length > 3 && (
-                      <div className="w-8 h-8 rounded-full border-2 border-black bg-zinc-800 flex items-center justify-center text-[8px] text-white z-0">
-                        +{playlist.trackIds.length - 3}
+
+                  {editingPlaylistId === playlist.id ? (
+                    <div className="mt-4 space-y-4">
+                      <p className="text-[8px] uppercase tracking-widest text-zinc-500 mb-2">Track Management</p>
+                      <div className="max-h-48 overflow-y-auto pr-2 custom-scrollbar space-y-1">
+                        {tracks.map(track => {
+                          const isInPlaylist = playlist.trackIds.includes(track.id);
+                          return (
+                            <button
+                              key={track.id}
+                              onClick={() => isInPlaylist ? onRemoveFromPlaylist(playlist.id, track.id) : onAddToPlaylist(playlist.id, track.id)}
+                              className={`w-full flex items-center justify-between p-2 rounded-lg text-left transition-all ${isInPlaylist ? 'bg-gold/10 text-gold' : 'hover:bg-white/5 text-zinc-500'}`}
+                            >
+                              <div className="flex items-center gap-2 min-w-0">
+                                <img src={track.art || '/src/assets/images/default_cover_1779345608057.png'} alt="" className="w-6 h-6 rounded-md object-cover" referrerPolicy="no-referrer" />
+                                <span className="text-[10px] truncate">{track.title}</span>
+                              </div>
+                              {isInPlaylist ? <X size={12} /> : <Plus size={12} />}
+                            </button>
+                          );
+                        })}
                       </div>
-                    )}
-                  </div>
+                      <button 
+                         onClick={() => setEditingPlaylistId(null)}
+                         className="w-full py-2 rounded-xl bg-white/5 text-zinc-500 text-[10px] uppercase tracking-widest font-bold hover:bg-white/10"
+                      >
+                        Done
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h4 className="text-white font-display tracking-widest uppercase mb-1">{playlist.title}</h4>
+                          <p className="text-zinc-500 text-[8px] uppercase tracking-widest mb-4">
+                            {playlist.trackIds.length} Tracks • {new Date(playlist.createdAt).toLocaleDateString()}
+                          </p>
+                        </div>
+                        {playlist.isPublic && (
+                          <div onClick={e => e.stopPropagation()}>
+                            <ShareButtons 
+                              url={window.location.origin + `/?playlist=${playlist.id}`} 
+                              title={playlist.title} 
+                              type="playlist"
+                            />
+                          </div>
+                        )}
+                      </div>
+                      
+                      <div className="mt-2 flex -space-x-3">
+                        {playlist.trackIds.slice(0, 3).map((tid, i) => {
+                          const track = tracks.find(t => t.id === tid);
+                          return track ? (
+                            <img 
+                              key={tid} 
+                              src={track.art || '/src/assets/images/default_cover_1779345608057.png'} 
+                              className="w-8 h-8 rounded-full border-2 border-black object-cover" 
+                              style={{ zIndex: 3 - i }}
+                              referrerPolicy="no-referrer"
+                            />
+                          ) : null;
+                        })}
+                        {playlist.trackIds.length > 3 && (
+                          <div className="w-8 h-8 rounded-full border-2 border-black bg-zinc-800 flex items-center justify-center text-[8px] text-white z-0">
+                            +{playlist.trackIds.length - 3}
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  )}
+
                 </motion.div>
               ))}
             </div>
@@ -500,7 +584,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                     onClick={() => onSelectTrack(track)}
                     className="glass-panel p-4 rounded-2xl flex items-center gap-4 cursor-pointer group"
                   >
-                    <img src={track.art} alt={track.title} className="w-16 h-16 rounded-xl object-cover" />
+                    <img src={track.art || '/src/assets/images/default_cover_1779345608057.png'} alt={track.title} className="w-16 h-16 rounded-xl object-cover" referrerPolicy="no-referrer" />
                     <div className="flex-1 min-w-0">
                       <h4 className="text-white text-sm font-medium truncate">{track.title}</h4>
                       <p className="text-zinc-500 text-[10px] uppercase tracking-widest truncate">{track.genre.join(', ')}</p>

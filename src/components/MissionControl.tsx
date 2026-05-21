@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Shield, 
@@ -9,7 +9,13 @@ import {
   Target,
   ChevronRight,
   Info,
-  RefreshCw
+  RefreshCw,
+  Sparkles,
+  Activity,
+  Loader2,
+  Play,
+  Pause,
+  Volume2
 } from 'lucide-react';
 import { 
   personalYear, 
@@ -20,6 +26,10 @@ import {
   compatibility,
   reduce
 } from '../services/numerologyService';
+import { generateDailyResonance } from '../services/geminiService';
+import Markdown from 'react-markdown';
+import { useToast } from './ToastProvider';
+import { useAudioNarrator } from '../hooks/useAudioNarrator';
 
 interface MissionControlProps {
   userData: { name: string; birthDate: string };
@@ -28,6 +38,11 @@ interface MissionControlProps {
 export const MissionControl: React.FC<MissionControlProps> = ({ userData }) => {
   const [compPartner, setCompPartner] = useState('');
   const [compResult, setCompResult] = useState<string | null>(null);
+  const [dailyResonance, setDailyResonance] = useState<string | null>(null);
+  const [loadingDaily, setLoadingDaily] = useState(false);
+  const { isPlaying, audioLoading, toggleText, setAudioBuffer } = useAudioNarrator();
+  
+  const { showToast } = useToast();
 
   const stats = useMemo(() => {
     const py = personalYear(userData.birthDate);
@@ -41,6 +56,28 @@ export const MissionControl: React.FC<MissionControlProps> = ({ userData }) => {
 
     return { py, pm, pd, wealth, directive, lifePath };
   }, [userData.birthDate]);
+
+  useEffect(() => {
+    const fetchDaily = async () => {
+      setLoadingDaily(true);
+      setAudioBuffer(null);
+      try {
+        const report = await generateDailyResonance(userData);
+        setDailyResonance(report);
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setLoadingDaily(false);
+      }
+    };
+    fetchDaily();
+  }, [userData.name, userData.birthDate]);
+
+  const handleToggleAudio = () => {
+    if (dailyResonance) {
+      toggleText(dailyResonance);
+    }
+  };
 
   const handleCompatibilityCheck = () => {
     if (!compPartner) return;
@@ -136,6 +173,60 @@ export const MissionControl: React.FC<MissionControlProps> = ({ userData }) => {
                   className="h-full gold-gradient"
                 />
               </div>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Daily Intelligence Briefing Card (NEW) */}
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15 }}
+          className="lg:col-span-2 glass-panel p-6 sm:p-8 rounded-3xl border border-white/5 relative overflow-hidden group"
+        >
+          <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity">
+            <Activity size={100} />
+          </div>
+          
+          <div className="relative z-10 space-y-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Sparkles size={14} className="text-gold" />
+                <span className="text-[8px] sm:text-[10px] uppercase tracking-[0.3em] text-zinc-500">Daily Intelligence Briefing</span>
+              </div>
+              <div className="flex items-center gap-3">
+                {dailyResonance && (
+                  <button 
+                    onClick={handleToggleAudio}
+                    disabled={audioLoading}
+                    className={`flex items-center gap-1.5 px-3 py-1 rounded-full border text-[8px] uppercase tracking-widest font-bold transition-all ${
+                      isPlaying 
+                        ? 'bg-gold text-black border-gold shadow-[0_0_10px_rgba(201,168,76,0.2)]' 
+                        : 'bg-gold/10 text-gold border-gold/20 hover:bg-gold/20'
+                    }`}
+                  >
+                    {audioLoading ? <Loader2 size={10} className="animate-spin" /> : isPlaying ? <Pause size={10} /> : <Volume2 size={10} />}
+                    {isPlaying ? 'Stop' : 'Listen'}
+                  </button>
+                )}
+                {loadingDaily && <Loader2 size={14} className="text-gold animate-spin" />}
+              </div>
+            </div>
+
+            <div className="min-h-[100px]">
+              {loadingDaily ? (
+                <div className="flex flex-col gap-2">
+                  <div className="h-4 bg-white/5 rounded-full w-3/4 animate-pulse" />
+                  <div className="h-4 bg-white/5 rounded-full w-full animate-pulse" />
+                  <div className="h-4 bg-white/5 rounded-full w-1/2 animate-pulse" />
+                </div>
+              ) : dailyResonance ? (
+                <div className="markdown-body prose prose-invert prose-xs prose-gold max-w-none prose-headings:font-display prose-headings:text-xs prose-headings:uppercase prose-headings:tracking-widest prose-p:text-zinc-400 prose-p:text-xs prose-p:leading-relaxed">
+                  <Markdown>{dailyResonance}</Markdown>
+                </div>
+              ) : (
+                <p className="text-zinc-600 text-[10px] uppercase tracking-widest italic">Intelligence stream offline...</p>
+              )}
             </div>
           </div>
         </motion.div>

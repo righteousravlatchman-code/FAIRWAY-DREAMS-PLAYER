@@ -4,6 +4,7 @@ import { Play, Pause, SkipBack, SkipForward, Volume2, Maximize2, ExternalLink, H
 import { AnimatePresence } from 'motion/react';
 import { Track, VisualizerMode, ThemeColors, VisualizerSettings, Playlist } from '../types';
 import { Visualizer } from './Visualizer';
+import { ShareButtons } from './ShareButtons';
 import { Settings, Sliders, Palette } from 'lucide-react';
 
 interface PlayerProps {
@@ -25,6 +26,7 @@ interface PlayerProps {
   onSettingsChange: (s: VisualizerSettings) => void;
   onThemeChange: (t: string) => void;
   onToggleFavorite: (trackId: string) => void;
+  onAddToPlaylist?: (playlistId: string, trackId: string) => void;
   onGenerateInsight: () => void;
   onSaveInsight: (track: Track, content: string) => void;
   onClearInsight: () => void;
@@ -32,6 +34,7 @@ interface PlayerProps {
   isGeneratingInsight: boolean;
   isLoading: boolean;
   error: string | null;
+  playlists: Playlist[];
 }
 
 export const Player: React.FC<PlayerProps> = ({
@@ -53,16 +56,19 @@ export const Player: React.FC<PlayerProps> = ({
   onSettingsChange,
   onThemeChange,
   onToggleFavorite,
+  onAddToPlaylist,
   onGenerateInsight,
   onSaveInsight,
   onClearInsight,
   currentInsight,
   isGeneratingInsight,
   isLoading,
-  error
+  error,
+  playlists
 }) => {
   const [showSettings, setShowSettings] = React.useState(false);
   const [showShare, setShowShare] = React.useState(false);
+  const [showPlaylistPicker, setShowPlaylistPicker] = React.useState(false);
   const [isFullscreen, setIsFullscreen] = React.useState(false);
 
   const formatTime = (s: number) => {
@@ -209,7 +215,7 @@ export const Player: React.FC<PlayerProps> = ({
           </AnimatePresence>
           
           {/* Overlay Info */}
-          <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none p-4">
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
             <motion.div 
               animate={{ 
                 scale: isPlaying ? [1, 1.08, 1] : 1,
@@ -217,9 +223,9 @@ export const Player: React.FC<PlayerProps> = ({
               transition={{ 
                 scale: { duration: 2, repeat: Infinity, ease: "easeInOut" },
               }}
-              className="relative mb-4 md:mb-6"
+              className="relative p-8"
             >
-              <div className="absolute -inset-4 rounded-full border border-white/10 animate-pulse" />
+              <div className="absolute inset-0 rounded-full border border-white/10 animate-pulse" />
               
               {/* Radial Signal Bars */}
               <div className="absolute inset-0 flex items-center justify-center">
@@ -235,12 +241,15 @@ export const Player: React.FC<PlayerProps> = ({
               </div>
 
               <img 
-                src={currentTrack.art} 
+                src={currentTrack.art || '/src/assets/images/default_cover_1779345608057.png'} 
                 alt={currentTrack.title}
-                className="w-24 h-24 md:w-32 md:h-32 rounded-full border-2 border-gold object-cover shadow-2xl relative z-10"
+                className="w-28 h-28 md:w-40 md:h-40 rounded-full border-2 border-gold object-cover shadow-2xl relative z-10"
+                referrerPolicy="no-referrer"
               />
             </motion.div>
-            
+          </div>
+
+          <div className="absolute inset-x-0 bottom-12 flex flex-col items-center justify-center pointer-events-none p-4">
             <h2 className="font-display text-xl md:text-2xl text-white tracking-widest mb-1 text-center">
               {currentTrack.title}
               {currentTrack.isLive && (
@@ -306,59 +315,69 @@ export const Player: React.FC<PlayerProps> = ({
           </div>
 
           <div className="absolute top-6 right-6 flex gap-2">
-            <div className="relative">
-              <button 
-                onClick={() => setShowShare(!showShare)}
-                className="p-2 rounded-lg bg-black/50 backdrop-blur-md border border-white/10 text-gold hover:bg-gold hover:text-black transition-colors"
-              >
-                <Share2 size={16} />
-              </button>
-              
-              <AnimatePresence>
-                {showShare && (
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.9, y: 10 }}
-                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.9, y: 10 }}
-                    className="absolute top-full right-0 mt-2 w-40 bg-black/90 backdrop-blur-xl border border-white/10 rounded-xl p-2 z-50 shadow-2xl"
-                  >
-                    <div className="flex flex-col gap-1">
-                      <button 
-                        onClick={() => handleShare('twitter')}
-                        className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 text-[10px] uppercase tracking-widest text-zinc-300 hover:text-gold transition-colors"
-                      >
-                        <Twitter size={14} /> Twitter
-                      </button>
-                      <button 
-                        onClick={() => handleShare('facebook')}
-                        className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 text-[10px] uppercase tracking-widest text-zinc-300 hover:text-gold transition-colors"
-                      >
-                        <Facebook size={14} /> Facebook
-                      </button>
-                      <button 
-                        onClick={() => handleShare('instagram')}
-                        className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 text-[10px] uppercase tracking-widest text-zinc-300 hover:text-gold transition-colors"
-                      >
-                        <Instagram size={14} /> Instagram
-                      </button>
-                      <button 
-                        onClick={() => handleShare('copy')}
-                        className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/10 text-[10px] uppercase tracking-widest text-zinc-300 hover:text-gold transition-colors"
-                      >
-                        <ExternalLink size={14} /> Copy Link
-                      </button>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+            <div className="bg-black/50 backdrop-blur-md rounded-lg p-1 border border-white/10 flex items-center pr-2">
+              <ShareButtons 
+                url={window.location.origin + `/?track=${currentTrack.id}`}
+                title={currentTrack.title}
+                type="track"
+              />
             </div>
 
             <button 
               onClick={() => onToggleFavorite(currentTrack.id)}
               className={`p-2 rounded-lg bg-black/50 backdrop-blur-md border border-white/10 transition-colors ${isFavorite ? 'text-red-500' : 'text-gold hover:text-red-500'}`}
+              title="Add to Liked Signals"
             >
               <Heart size={16} fill={isFavorite ? "currentColor" : "none"} />
             </button>
+
+            {onAddToPlaylist && (
+              <div className="relative">
+                <button 
+                  onClick={() => setShowPlaylistPicker(!showPlaylistPicker)}
+                  className={`p-2 rounded-lg bg-black/50 backdrop-blur-md border border-white/10 transition-colors ${showPlaylistPicker ? 'bg-gold text-black border-gold' : 'text-gold hover:bg-gold hover:text-black'}`}
+                  title="Add to Vault"
+                >
+                  <Save size={16} />
+                </button>
+                
+                <AnimatePresence>
+                  {showPlaylistPicker && (
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.9, y: 10 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.9, y: 10 }}
+                      className="absolute top-full right-0 mt-2 w-56 bg-black/90 backdrop-blur-xl border border-white/10 rounded-xl p-3 z-50 shadow-2xl"
+                    >
+                      <h5 className="text-[8px] uppercase tracking-widest text-zinc-500 mb-3 border-b border-white/5 pb-2">Save to Curation Vault</h5>
+                      <div className="flex flex-col gap-1 max-h-48 overflow-y-auto pr-1 custom-scrollbar">
+                        {playlists.length > 0 ? (
+                          playlists.map(playlist => {
+                            const isInPlaylist = playlist.trackIds.includes(currentTrack.id);
+                            return (
+                              <button 
+                                key={playlist.id}
+                                onClick={() => {
+                                  onAddToPlaylist(playlist.id!, currentTrack.id);
+                                  setShowPlaylistPicker(false);
+                                }}
+                                className={`flex items-center justify-between px-3 py-2 rounded-lg text-left text-[10px] uppercase tracking-wider transition-all ${isInPlaylist ? 'bg-gold/10 text-gold cursor-default' : 'hover:bg-white/10 text-zinc-300 hover:text-gold'}`}
+                              >
+                                <span>{playlist.title}</span>
+                                {isInPlaylist && <Sparkles size={10} />}
+                              </button>
+                            );
+                          })
+                        ) : (
+                          <p className="text-[8px] text-zinc-600 text-center py-4">No vaults found. Create one in your Profile.</p>
+                        )}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            )}
+
             <button 
               onClick={() => setIsFullscreen(true)}
               className="p-2 rounded-lg bg-black/50 backdrop-blur-md border border-white/10 text-gold hover:bg-gold hover:text-black transition-colors group/fs"
@@ -413,7 +432,7 @@ export const Player: React.FC<PlayerProps> = ({
               <div className="flex flex-col md:flex-row md:items-center gap-3">
                 <span className="text-[10px] uppercase tracking-widest text-[var(--text-secondary)] hidden md:inline">Visualizer</span>
                 <div className="flex flex-wrap items-center justify-center gap-1.5 md:gap-1">
-                  {(['bars', 'wave', 'radial', 'particles', 'mirror', 'scope'] as VisualizerMode[]).map((m) => (
+                  {(['bars', 'wave', 'radial', 'particles', 'mirror', 'scope', 'tunnel', 'nebula', 'vortex', 'matrix', 'kaleidoscope'] as VisualizerMode[]).map((m) => (
                     <button
                       key={m}
                       onClick={() => updateSetting('mode', m)}
@@ -444,14 +463,15 @@ export const Player: React.FC<PlayerProps> = ({
               <div className="flex items-center justify-center md:justify-start gap-3">
                 <span className="text-[10px] uppercase tracking-widest text-[var(--text-secondary)] hidden md:inline">Frequency</span>
                 <div className="flex gap-4 md:gap-2">
-                  {['gold', 'blue', 'violet', 'emerald'].map((t) => (
+                  {['gold', 'blue', 'violet', 'emerald', 'day'].map((t) => (
                     <button
                       key={t}
                       onClick={() => onThemeChange(t)}
                       className={`relative w-8 h-8 md:w-5 md:h-5 rounded-full border-2 transition-transform hover:scale-125 ${
                         t === 'gold' ? 'bg-[#c9a84c]' : 
                         t === 'blue' ? 'bg-[#4fc3f7]' : 
-                        t === 'violet' ? 'bg-[#a78bfa]' : 'bg-[#34d399]'
+                        t === 'violet' ? 'bg-[#a78bfa]' : 
+                        t === 'emerald' ? 'bg-[#34d399]' : 'bg-[#f5f5dc]'
                       } ${themeName === t ? 'border-white' : 'border-transparent'}`}
                     >
                       {themeName === t && (
@@ -707,10 +727,32 @@ export const Player: React.FC<PlayerProps> = ({
               />
             </div>
 
+            {/* Centered focal art for Fullscreen */}
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <motion.div 
+                animate={{ 
+                  scale: isPlaying ? [1, 1.05, 1] : 1,
+                  rotate: isPlaying ? [0, 360] : 0
+                }}
+                transition={{ 
+                  scale: { duration: 4, repeat: Infinity, ease: "easeInOut" },
+                  rotate: { duration: 60, repeat: Infinity, ease: "linear" }
+                }}
+                className="relative p-12"
+              >
+                 <div className="absolute inset-0 rounded-full border border-gold/10 animate-pulse" />
+                 <img 
+                  src={currentTrack.art || '/src/assets/images/default_cover_1779345608057.png'} 
+                  alt={currentTrack.title}
+                  className="w-48 h-48 md:w-72 md:h-72 rounded-full border-4 border-gold/50 object-cover shadow-[0_0_50px_rgba(201,168,76,0.3)] relative z-10"
+                />
+              </motion.div>
+            </div>
+
             {/* Top Bar */}
             <div className="relative z-10 p-6 flex items-center justify-between bg-gradient-to-b from-black/80 to-transparent">
               <div className="flex items-center gap-4">
-                <img src={currentTrack.art} alt={currentTrack.title} className="w-12 h-12 rounded-full border border-gold" />
+                <img src={currentTrack.art || '/src/assets/images/default_cover_1779345608057.png'} alt={currentTrack.title} className="w-12 h-12 rounded-full border border-gold" referrerPolicy="no-referrer" />
                 <div>
                   <h3 className="text-white font-display tracking-widest text-sm">{currentTrack.title}</h3>
                   <p className="text-gold text-[8px] uppercase tracking-widest">Fairway Dreams Studio</p>

@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Shield, Users, MessageSquare, Trash2, CheckCircle, AlertCircle, Megaphone, BarChart3, Save, Plus, Music, Film, Image as ImageIcon, X, Upload, FileJson, FileAudio, Loader2, Activity, Radio, AudioLines } from 'lucide-react';
-import { db, collection, onSnapshot, query, orderBy, limit, deleteDoc, doc, updateDoc, setDoc, serverTimestamp, addDoc, writeBatch, storage, ref, uploadBytes, getDownloadURL, handleFirestoreError, OperationType, getDocFromServer } from '../firebase';
-import { MediaItem, MediaType } from '../types';
+import { Shield, Users, MessageSquare, Trash2, CheckCircle, AlertCircle, Megaphone, BarChart3, Save, Plus, Music, Film, Image as ImageIcon, X, Upload, FileJson, FileAudio, Loader2, Activity, Radio, AudioLines, Globe, Lock, ShoppingBag } from 'lucide-react';
+import { db, auth, collection, onSnapshot, query, orderBy, limit, deleteDoc, doc, updateDoc, setDoc, serverTimestamp, addDoc, writeBatch, storage, ref, uploadBytes, getDownloadURL, handleFirestoreError, OperationType, getDocFromServer } from '../firebase';
+import { MediaItem, MediaType, Playlist, Product } from '../types';
 import { useToast } from './ToastProvider';
 import { normalizeAudioUrl } from '../lib/audioUtils';
 
@@ -14,6 +14,8 @@ export const AdminDashboard: React.FC = () => {
   const [interactions, setInteractions] = useState<any[]>([]);
   const [media, setMedia] = useState<MediaItem[]>([]);
   const [playlists, setPlaylists] = useState<any[]>([]);
+  const [products, setProducts] = useState<any[]>([]);
+  const [orders, setOrders] = useState<any[]>([]);
   const [config, setConfig] = useState<any>({
     announcement: { text: '', active: false, type: 'info' }
   });
@@ -22,7 +24,9 @@ export const AdminDashboard: React.FC = () => {
   const [showMediaForm, setShowMediaForm] = useState(false);
   const [showBulkForm, setShowBulkForm] = useState(false);
   const [showBulkAudioForm, setShowBulkAudioForm] = useState(false);
+  const [showQuickImport, setShowQuickImport] = useState(false);
   const [showPlaylistForm, setShowPlaylistForm] = useState(false);
+  const [showProductForm, setShowProductForm] = useState(false);
   const [bulkJson, setBulkJson] = useState('');
   const [bulkError, setBulkError] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number } | null>(null);
@@ -30,6 +34,11 @@ export const AdminDashboard: React.FC = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [isUploadingFile, setIsUploadingFile] = useState<{ field: string; loading: boolean } | null>(null);
   const [isTestingConnection, setIsTestingConnection] = useState(false);
+  
+  const [selectedMediaIds, setSelectedMediaIds] = useState<string[]>([]);
+  const [batchImageUrl, setBatchImageUrl] = useState('');
+  const [isMigrating, setIsMigrating] = useState(false);
+  const [isConfirmingBulkDelete, setIsConfirmingBulkDelete] = useState(false);
   
   const addLog = (msg: string, type: 'info' | 'success' | 'error' = 'info') => {
     const timestamp = new Date().toLocaleTimeString();
@@ -90,13 +99,26 @@ export const AdminDashboard: React.FC = () => {
     streamUrl: ''
   });
 
-  const [newPlaylist, setNewPlaylist] = useState({
+  const [newPlaylist, setNewPlaylist] = useState<Partial<Playlist>>({
     title: '',
     description: '',
     art: '',
-    trackIds: [] as string[]
+    trackIds: [],
+    isPublic: true
   });
   const [editingPlaylistId, setEditingPlaylistId] = useState<string | null>(null);
+
+  const [newProduct, setNewProduct] = useState<Partial<Product>>({
+    name: '',
+    description: '',
+    price: 0,
+    category: 'Apparel',
+    images: [],
+    stock: 0,
+    sizes: [],
+    features: []
+  });
+  const [editingProductId, setEditingProductId] = useState<string | null>(null);
 
   useEffect(() => {
     // Listen to recent messages
@@ -142,6 +164,18 @@ export const AdminDashboard: React.FC = () => {
       setContacts(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
     }, (err) => handleFirestoreError(err, OperationType.LIST, 'contacts'));
 
+    // Listen to products
+    const productsRef = collection(db, 'products');
+    const unsubscribeProducts = onSnapshot(productsRef, (snapshot) => {
+      setProducts(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+    }, (err) => handleFirestoreError(err, OperationType.LIST, 'products'));
+
+    // Listen to orders
+    const ordersRef = collection(db, 'orders');
+    const unsubscribeOrders = onSnapshot(ordersRef, (snapshot) => {
+      setOrders(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+    }, (err) => handleFirestoreError(err, OperationType.LIST, 'orders'));
+
     // Listen to interactions
     const interactionsRef = collection(db, 'interactions');
     const qInteractions = query(interactionsRef, orderBy('timestamp', 'desc'), limit(10));
@@ -172,6 +206,195 @@ export const AdminDashboard: React.FC = () => {
     }
   };
 
+  const handleBulkDelete = async () => {
+    if (selectedMediaIds.length === 0) return;
+    setIsSaving(true);
+    try {
+      const batch = writeBatch(db);
+      selectedMediaIds.forEach(id => {
+        batch.delete(doc(db, 'media', id));
+      });
+      await batch.commit();
+      showToast(`Deleted ${selectedMediaIds.length} items successfully`, "success");
+      setSelectedMediaIds([]);
+      setIsConfirmingBulkDelete(false);
+    } catch (error: any) {
+      console.error("Bulk delete error:", error);
+      showToast(`Failed to delete items: ${error.message}`, "error");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleBatchUpdateImages = async () => {
+    if (!batchImageUrl || selectedMediaIds.length === 0) return;
+    setIsSaving(true);
+    try {
+      const batch = writeBatch(db);
+      selectedMediaIds.forEach(id => {
+        batch.update(doc(db, 'media', id), {
+          art: batchImageUrl,
+          updatedAt: serverTimestamp()
+        });
+      });
+      await batch.commit();
+      showToast(`Updated ${selectedMediaIds.length} images`, 'success');
+      setSelectedMediaIds([]);
+      setBatchImageUrl('');
+    } catch (error) {
+      console.error("Batch update error:", error);
+      showToast("Failed to update images", "error");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const seedDatabase = async () => {
+    const { TRACKS } = await import('../constants');
+    setIsMigrating(true);
+    addLog('Starting database seeding from TRACKS constants...');
+    try {
+      const batch = writeBatch(db);
+      let count = 0;
+      
+      // Get existing titles to prevent duplicates
+      const existingTitles = new Set(media.map(m => m.title.toLowerCase()));
+
+      for (const track of TRACKS) {
+        if (existingTitles.has(track.title.toLowerCase())) {
+          addLog(`Skipping duplicate: ${track.title}`);
+          continue;
+        }
+
+        const docRef = doc(collection(db, 'media'));
+        batch.set(docRef, {
+          ...track,
+          mediaUrl: normalizeAudioUrl(track.url || track.mediaUrl || ''),
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        });
+        count++;
+      }
+
+      if (count > 0) {
+        await batch.commit();
+        addLog(`Seeded ${count} new tracks to Firestore`, 'success');
+        showToast(`Database seeded with ${count} tracks`, 'success');
+      } else {
+        addLog('No new tracks to seed.', 'info');
+        showToast('Library is already synced', 'info');
+      }
+    } catch (error: any) {
+      addLog(`Seeding failed: ${error.message}`, 'error');
+      showToast("Seeding failed", "error");
+    } finally {
+      setIsMigrating(false);
+    }
+  };
+
+  const seedProducts = async () => {
+    setIsMigrating(true);
+    addLog('Starting product library seeding...');
+    try {
+      const MOCK_PRODUCTS = [
+        {
+          name: 'Resonance Frequency Hoodie',
+          description: 'Heavyweight organic cotton oversized hoodie with 432Hz frequency wave embroidery. Engineered for deep listening sessions and thermal regulation during meditation.',
+          price: 88,
+          category: 'Apparel',
+          images: ['https://images.unsplash.com/photo-1556821840-3a63f95609a7?auto=format&fit=crop&q=80&w=800'],
+          stock: 33,
+          sizes: ['S', 'M', 'L', 'XL'],
+          features: ['400GSM Organic Cotton', 'Frequency Wave Embroidery', 'Secret Inner Pocket'],
+        },
+        {
+          name: 'GG33 Numerology Dad Hat',
+          description: 'Minimalist dad hat featuring the sacred numerology patterns. A silent signal for the initiated.',
+          price: 33,
+          category: 'Accessories',
+          images: ['https://images.unsplash.com/photo-1588850561407-ed78c282e89b?auto=format&fit=crop&q=80&w=800'],
+          stock: 55,
+          sizes: ['Adjustable'],
+          features: ['100% Cotton Twill', 'Unstructured 6-panel', 'Brass Buckle'],
+        },
+        {
+          name: 'Golden Ratio Silk Scarf',
+          description: 'Mulberry silk scarf printed with the 1.618 sequence. Can be used as a meditation blindfold or an elegant accessory.',
+          price: 108,
+          category: 'Apparel',
+          images: ['https://images.unsplash.com/photo-1520903920243-00d872a2d1c9?auto=format&fit=crop&q=80&w=800'],
+          stock: 22,
+          sizes: ['90x90cm'],
+          features: ['100% Mulberry Silk', 'Hand-rolled edges', 'Archival quality print'],
+        },
+        {
+          name: 'Quantum State Scented Candle',
+          description: 'Proprietary blend of Sandalwood, Frankincense, and Myrrh. Designed to anchor your physical space during frequency work.',
+          price: 44,
+          category: 'Lifestyle',
+          images: ['https://images.unsplash.com/photo-1603006905003-be475563bc59?auto=format&fit=crop&q=80&w=800'],
+          stock: 88,
+          sizes: ['12oz'],
+          features: ['Soy Wax Blend', '60hr Burn Time', 'Amethyst Crystal Inside'],
+        },
+        {
+          name: 'Hemi-Sync Meditation Mat',
+          description: 'Ergonomic meditation mat with alignment markers designed to optimize your posture for binaural beat sessions.',
+          price: 144,
+          category: 'Wellness',
+          images: ['https://images.unsplash.com/photo-1620138546344-7b2c08517ed5?auto=format&fit=crop&q=80&w=800'],
+          stock: 11,
+          sizes: ['Standard'],
+          features: ['Natural Rubber Base', 'Alignment Mapping', 'Antispectral Surface'],
+        },
+        {
+          name: 'Mystic Rebel Astrology Deck',
+          description: 'A 78-card deck for navigating the digital zeitgeist. Blends traditional tarot with modern frequency archetypes.',
+          price: 55,
+          category: 'Tools',
+          images: ['https://images.unsplash.com/photo-1601314167099-232775b3d6fd?auto=format&fit=crop&q=80&w=800'],
+          stock: 99,
+          sizes: ['Standard Card'],
+          features: ['Gold Foil Detail', '350gsm Cardstock', 'Instruction Book Included'],
+        }
+      ];
+
+      const batch = writeBatch(db);
+      let count = 0;
+      
+      const existingNames = new Set(products.map(p => p.name.toLowerCase()));
+
+      for (const product of MOCK_PRODUCTS) {
+        if (existingNames.has(product.name.toLowerCase())) {
+          addLog(`Skipping duplicate product: ${product.name}`);
+          continue;
+        }
+
+        const docRef = doc(collection(db, 'products'));
+        batch.set(docRef, {
+          ...product,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        });
+        count++;
+      }
+
+      if (count > 0) {
+        await batch.commit();
+        addLog(`Successfully seeded ${count} new products`, 'success');
+        showToast(`Store populated with ${count} items`, 'success');
+      } else {
+        addLog('No new products to seed.', 'info');
+        showToast('Store library already populated', 'info');
+      }
+    } catch (error: any) {
+      addLog(`Product seeding failed: ${error.message}`, 'error');
+      showToast("Store seeding failed", "error");
+    } finally {
+      setIsMigrating(false);
+    }
+  };
+
   const handleToggleLive = async (item: MediaItem) => {
     try {
       await updateDoc(doc(db, 'media', item.id), {
@@ -199,6 +422,50 @@ export const AdminDashboard: React.FC = () => {
       showToast('Configuration saved', 'success');
     } catch (error) {
       console.error("Error saving config:", error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const [quickLinks, setQuickLinks] = useState('');
+
+  const handleQuickLinkImport = async () => {
+    if (!quickLinks.trim()) return;
+    setIsSaving(true);
+    addLog('Starting Quick Link Import...');
+    
+    try {
+      // Split by lines or commas
+      const links = quickLinks.split(/[\n,]+/).map(l => l.trim()).filter(l => l.length > 5);
+      const batch = writeBatch(db);
+      let count = 0;
+
+      for (const link of links) {
+        const normalized = normalizeAudioUrl(link);
+        // Simple title extraction from URL uuid
+        const uuidMatch = normalized.match(/([a-f0-9-]{36})/);
+        const title = uuidMatch ? `Imported Signal ${uuidMatch[1].slice(0, 8)}` : `New Signal ${media.length + count + 1}`;
+        
+        const docRef = doc(collection(db, 'media'));
+        batch.set(docRef, {
+          title,
+          type: 'audio',
+          url: link,
+          mediaUrl: normalized,
+          art: '/src/assets/images/default_cover_1779345608057.png',
+          genre: ['Imported'],
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        });
+        count++;
+      }
+
+      await batch.commit();
+      addLog(`Imported ${count} links successfully`, 'success');
+      showToast(`Added ${count} songs to library`, 'success');
+      setQuickLinks('');
+    } catch (error: any) {
+      addLog(`Import failed: ${error.message}`, 'error');
     } finally {
       setIsSaving(false);
     }
@@ -237,28 +504,69 @@ export const AdminDashboard: React.FC = () => {
   };
 
   const handleSavePlaylist = async () => {
-    if (!newPlaylist.title) return;
+    if (!newPlaylist.title || !auth.currentUser) return;
     setIsSaving(true);
     try {
+      const playlistData = {
+        ...newPlaylist,
+        userId: auth.currentUser.uid,
+        updatedAt: serverTimestamp()
+      };
+      
       if (editingPlaylistId) {
-        await updateDoc(doc(db, 'playlists', editingPlaylistId), {
-          ...newPlaylist,
+        await updateDoc(doc(db, 'playlists', editingPlaylistId), playlistData);
+      } else {
+        await addDoc(collection(db, 'playlists'), {
+          ...playlistData,
+          createdAt: serverTimestamp()
+        });
+      }
+      setNewPlaylist({ title: '', description: '', art: '', trackIds: [], isPublic: true });
+      setEditingPlaylistId(null);
+      setShowPlaylistForm(false);
+      showToast(editingPlaylistId ? 'Playlist updated' : 'Playlist created', 'success');
+    } catch (error) {
+      console.error("Error saving playlist:", error);
+      showToast('Failed to save playlist', 'error');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSaveProduct = async () => {
+    if (!newProduct.name || !newProduct.price) return;
+    setIsSaving(true);
+    try {
+      if (editingProductId) {
+        await updateDoc(doc(db, 'products', editingProductId), {
+          ...newProduct,
           updatedAt: serverTimestamp()
         });
       } else {
-        await addDoc(collection(db, 'playlists'), {
-          ...newPlaylist,
+        await addDoc(collection(db, 'products'), {
+          ...newProduct,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp()
         });
       }
-      setNewPlaylist({ title: '', description: '', art: '', trackIds: [] });
-      setEditingPlaylistId(null);
-      setShowPlaylistForm(false);
+      setNewProduct({ name: '', description: '', price: 0, category: 'Apparel', images: [], stock: 0, sizes: [], features: [] });
+      setEditingProductId(null);
+      setShowProductForm(false);
+      showToast(editingProductId ? 'Product Updated' : 'Product Added', 'success');
     } catch (error) {
-      console.error("Error saving playlist:", error);
+      console.error("Error saving product:", error);
+      showToast('Error saving product', 'error');
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleDeleteProduct = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, 'products', id));
+      showToast('Product Deleted', 'success');
+    } catch (error) {
+      console.error("Error deleting product:", error);
     }
   };
 
@@ -277,7 +585,8 @@ export const AdminDashboard: React.FC = () => {
       title: playlist.title,
       description: playlist.description || '',
       art: playlist.art || '',
-      trackIds: playlist.trackIds || []
+      trackIds: playlist.trackIds || [],
+      isPublic: playlist.isPublic !== undefined ? playlist.isPublic : true
     });
     setEditingPlaylistId(playlist.id);
     setShowPlaylistForm(true);
@@ -416,31 +725,65 @@ export const AdminDashboard: React.FC = () => {
     reader.readAsText(file);
   };
 
-  const handleSoloFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, field: 'art' | 'mediaUrl') => {
+  const handleSoloFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, field: 'art' | 'mediaUrl' | 'images', target: 'media' | 'playlist' | 'product' = 'media') => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setIsUploadingFile({ field, loading: true });
-    addLog(`Uploading individual file for ${field}: ${file.name}`);
+    addLog(`Uploading file for ${field}: ${file.name}`);
 
     try {
       const sanitizedName = file.name.replace(/[^a-zA-Z0-9.]/g, '_');
-      const folder = field === 'art' ? 'art' : (newMedia.type || 'audio');
+      const folder = field === 'art' || field === 'images' ? 'art' : (newMedia.type || 'audio');
       const storagePath = `media/${folder}/${Date.now()}_${sanitizedName}`;
       const storageRef = ref(storage, storagePath);
       
       const snapshot = await uploadBytes(storageRef, file);
       const downloadUrl = await getDownloadURL(snapshot.ref);
       
-      setNewMedia(prev => ({ ...prev, [field]: downloadUrl }));
-      addLog(`Individual upload success: ${file.name}`, 'success');
-      showToast(`${field} file uploaded successfully`, 'success');
+      if (target === 'media') {
+        setNewMedia(prev => ({ ...prev, [field as string]: downloadUrl }));
+      } else if (target === 'playlist') {
+        setNewPlaylist(prev => ({ ...prev, [field as string]: downloadUrl }));
+      } else if (target === 'product') {
+        setNewProduct(prev => {
+          if (field === 'images') {
+            return { ...prev, images: [downloadUrl, ...(prev.images || []).slice(1)] };
+          }
+          return { ...prev, [field as string]: downloadUrl };
+        });
+      }
+      
+      addLog(`Upload success: ${file.name}`, 'success');
+      showToast(`File uploaded successfully`, 'success');
     } catch (error: any) {
       console.error(`Error uploading ${field}:`, error);
-      addLog(`Individual upload FAILED: ${error.message}`, 'error');
+      addLog(`Upload FAILED: ${error.message}`, 'error');
       showToast(`Upload failed: ${error.message}`, 'error');
     } finally {
       setIsUploadingFile(null);
+    }
+  };
+
+  const handleBatchImageFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsSaving(true);
+    addLog(`Uploading batch image: ${file.name}`);
+    try {
+      const sanitizedName = file.name.replace(/[^a-zA-Z0-9.]/g, '_');
+      const storagePath = `media/batch/${Date.now()}_${sanitizedName}`;
+      const storageRef = ref(storage, storagePath);
+      const snapshot = await uploadBytes(storageRef, file);
+      const downloadUrl = await getDownloadURL(snapshot.ref);
+      setBatchImageUrl(downloadUrl);
+      addLog(`Batch upload success`, 'success');
+      showToast("Batch image uploaded", "success");
+    } catch (error: any) {
+      addLog(`Batch upload failed: ${error.message}`, 'error');
+      showToast(`Upload failed: ${error.message}`, "error");
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -490,7 +833,7 @@ export const AdminDashboard: React.FC = () => {
               type,
               url: downloadUrl, // Set both for compatibility
               mediaUrl: downloadUrl,
-              art: type === 'image' ? downloadUrl : 'https://picsum.photos/seed/audio/800/800', // Default art
+              art: type === 'image' ? downloadUrl : '/src/assets/images/default_cover_1779345608057.png', // Default art
               genre: ['Uncategorized'],
               createdAt: serverTimestamp(),
               description: `Bulk uploaded file: ${file.name}`,
@@ -715,6 +1058,29 @@ export const AdminDashboard: React.FC = () => {
                 {showBulkAudioForm ? 'Cancel' : 'Bulk Upload'}
               </button>
               <button 
+                onClick={() => {
+                  setShowQuickImport(!showQuickImport);
+                  setShowMediaForm(false);
+                  setShowBulkForm(false);
+                  setShowBulkAudioForm(false);
+                }}
+                className={`flex items-center gap-2 px-6 py-2 rounded-xl border transition-all text-[10px] font-bold uppercase tracking-widest ${
+                  showQuickImport ? 'bg-gold text-black border-gold' : 'bg-white/5 border-white/10 text-gold hover:bg-white/10'
+                }`}
+              >
+                {showQuickImport ? <X size={14} /> : <AudioLines size={14} />}
+                {showQuickImport ? 'Cancel' : 'Quick Link Import'}
+              </button>
+              <button 
+                onClick={seedDatabase}
+                disabled={isMigrating}
+                className="flex items-center gap-2 px-6 py-2 rounded-xl border border-gold/30 bg-gold/5 text-gold hover:bg-gold/10 transition-all text-[10px] font-bold uppercase tracking-widest disabled:opacity-50"
+                title="Migrates hardcoded TRACKS from constants.ts to Firestore"
+              >
+                {isMigrating ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+                Onboard Initial Library
+              </button>
+              <button 
                 onClick={testFirebaseConnection}
                 disabled={isTestingConnection}
                 className="flex items-center gap-2 px-6 py-2 rounded-xl border border-white/10 bg-white/5 text-zinc-400 hover:bg-white/10 transition-all text-[10px] font-bold uppercase tracking-widest disabled:opacity-50"
@@ -835,6 +1201,41 @@ export const AdminDashboard: React.FC = () => {
                 ))}
               </div>
             </div>
+          )}
+
+          {showQuickImport && (
+            <motion.div 
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              className="mb-8 p-6 rounded-2xl bg-white/5 border border-white/10"
+            >
+              <div className="flex items-center gap-3 mb-4">
+                <AudioLines className="text-gold" size={20} />
+                <h3 className="text-white text-sm font-display tracking-widest">Quick Link Import</h3>
+              </div>
+              
+              <div className="space-y-4">
+                <p className="text-[10px] text-zinc-500 uppercase tracking-widest leading-relaxed">
+                  Paste multiple audio links (Suno.com, direct MP3s, etc.) separated by lines or commas. 
+                  Existing "Already Uploaded" content can be quickly added to your dynamic library here.
+                </p>
+                <textarea 
+                  value={quickLinks}
+                  onChange={(e) => setQuickLinks(e.target.value)}
+                  placeholder="Paste links here (https://suno.com/song/... or https://.../*.mp3)"
+                  className="w-full bg-black/40 border border-white/10 rounded-2xl px-4 py-3 text-xs font-mono text-gold/80 outline-none focus:border-gold h-32 custom-scrollbar"
+                />
+                <div className="flex justify-end">
+                  <button 
+                    onClick={handleQuickLinkImport}
+                    disabled={isSaving || !quickLinks.trim()}
+                    className="px-10 py-3 rounded-xl gold-gradient text-black text-[10px] font-bold uppercase tracking-widest hover:scale-105 transition-all disabled:opacity-50"
+                  >
+                    {isSaving ? 'Importing...' : 'Add Links to Library'}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
           )}
 
           {showBulkForm && (
@@ -1065,10 +1466,122 @@ export const AdminDashboard: React.FC = () => {
             </motion.form>
           )}
 
+          {selectedMediaIds.length > 0 && (
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mb-8 p-6 rounded-3xl bg-gold/10 border border-gold/30 shadow-2xl flex flex-col md:flex-row items-center justify-between gap-6"
+            >
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-gold/20 flex items-center justify-center text-gold">
+                  {isConfirmingBulkDelete ? <AlertCircle size={24} /> : <ImageIcon size={24} />}
+                </div>
+                <div>
+                  <h3 className="text-white text-sm font-display tracking-widest">
+                    {isConfirmingBulkDelete ? 'Confirm Bulk Deletion' : 'Batch Image Update'}
+                  </h3>
+                  <p className="text-[10px] text-zinc-500 uppercase tracking-widest">{selectedMediaIds.length} items selected</p>
+                </div>
+              </div>
+              
+              <div className="flex-1 w-full max-w-md flex gap-2 items-center">
+                {!isConfirmingBulkDelete ? (
+                  <>
+                    <div className="flex-1 flex gap-2">
+                      <input 
+                        type="text"
+                        value={batchImageUrl}
+                        onChange={(e) => setBatchImageUrl(e.target.value)}
+                        placeholder="Enter new image URL for selected items..."
+                        className="flex-1 bg-black/40 border border-white/10 rounded-xl px-4 py-2 text-xs text-white outline-none focus:border-gold"
+                      />
+                      <label className="cursor-pointer p-2 rounded-xl bg-white/5 border border-white/10 text-gold hover:bg-gold hover:text-black transition-all flex items-center justify-center min-w-[40px]">
+                        <input 
+                          type="file" 
+                          accept="image/*" 
+                          onChange={handleBatchImageFileUpload} 
+                          className="hidden" 
+                          disabled={isSaving}
+                        />
+                        {isSaving && batchImageUrl === '' ? <Loader2 size={16} className="animate-spin" /> : <ImageIcon size={16} />}
+                      </label>
+                    </div>
+                    <button 
+                      onClick={handleBatchUpdateImages}
+                      disabled={isSaving || !batchImageUrl}
+                      className="px-6 py-2 rounded-xl gold-gradient text-black text-[10px] font-bold uppercase tracking-widest hover:scale-105 transition-all disabled:opacity-50 h-10"
+                    >
+                      {isSaving ? 'Updating...' : 'Apply Image'}
+                    </button>
+                    <button 
+                      onClick={() => setIsConfirmingBulkDelete(true)}
+                       title="Delete Selected Items"
+                      className="w-10 h-9 flex items-center justify-center rounded-xl bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500/20 transition-all"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                    <button 
+                      onClick={() => setSelectedMediaIds([])}
+                      className="px-4 py-2 rounded-xl bg-white/5 text-zinc-400 text-[10px] font-bold uppercase tracking-widest hover:text-white transition-all h-9"
+                    >
+                      Cancel
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <p className="flex-1 text-[10px] text-zinc-400 uppercase tracking-widest font-bold text-center md:text-left">
+                      Permanently delete {selectedMediaIds.length} items?
+                    </p>
+                    <div className="flex gap-2">
+                      <button 
+                        onClick={handleBulkDelete}
+                        disabled={isSaving}
+                        className="px-6 py-2 rounded-xl bg-red-600 text-white text-[10px] font-bold uppercase tracking-widest hover:bg-red-700 transition-all disabled:opacity-50 h-9"
+                      >
+                        {isSaving ? 'Deleting...' : 'Confirm'}
+                      </button>
+                      <button 
+                        onClick={() => setIsConfirmingBulkDelete(false)}
+                        className="px-4 py-2 rounded-xl bg-white/5 text-zinc-400 text-[10px] font-bold uppercase tracking-widest hover:text-white transition-all h-9"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            </motion.div>
+          )}
+
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
             {media.map((item) => (
-              <div key={item.id} className="group relative p-4 rounded-2xl bg-white/5 border border-white/5 flex gap-4 items-center">
-                <img src={item.art} className="w-16 h-16 rounded-lg object-cover border border-white/10" alt="" />
+              <div 
+                key={item.id} 
+                className={`group relative p-4 rounded-2xl flex gap-4 items-center transition-all border ${
+                  selectedMediaIds.includes(item.id) 
+                    ? 'bg-gold/10 border-gold shadow-[0_0_20px_rgba(201,168,76,0.1)]' 
+                    : 'bg-white/5 border-white/5 hover:border-white/20'
+                }`}
+              >
+                <div 
+                  className="absolute -left-2 -top-2 z-10 cursor-pointer"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const exists = selectedMediaIds.includes(item.id);
+                    if (exists) {
+                      setSelectedMediaIds(selectedMediaIds.filter(id => id !== item.id));
+                    } else {
+                      setSelectedMediaIds([...selectedMediaIds, item.id]);
+                    }
+                  }}
+                >
+                  <div className={`w-5 h-5 rounded border flex items-center justify-center transition-all ${
+                    selectedMediaIds.includes(item.id) ? 'bg-gold border-gold text-black shadow-lg shadow-gold/20' : 'bg-black/60 border-white/20 text-transparent'
+                  }`}>
+                    <CheckCircle size={12} className={selectedMediaIds.includes(item.id) ? 'opacity-100' : 'opacity-0'} />
+                  </div>
+                </div>
+                <img src={item.art || '/src/assets/images/default_cover_1779345608057.png'} className="w-16 h-16 rounded-lg object-cover border border-white/10" alt="" referrerPolicy="no-referrer" />
                 <div className="flex-1 min-w-0">
                   <h3 className="text-white text-sm font-medium truncate">{item.title}</h3>
                   <div className="flex items-center gap-2 mt-1">
@@ -1154,13 +1667,25 @@ export const AdminDashboard: React.FC = () => {
                 </div>
                 <div>
                   <label className="block text-[10px] uppercase tracking-widest text-zinc-500 mb-2">Cover Art URL</label>
-                  <input 
-                    type="text"
-                    value={newPlaylist.art}
-                    onChange={(e) => setNewPlaylist({ ...newPlaylist, art: e.target.value })}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-[var(--text-primary)] outline-none focus:border-gold"
-                    placeholder="https://..."
-                  />
+                  <div className="flex gap-2">
+                    <input 
+                      type="text"
+                      value={newPlaylist.art}
+                      onChange={(e) => setNewPlaylist({ ...newPlaylist, art: e.target.value })}
+                      className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-[var(--text-primary)] outline-none focus:border-gold"
+                      placeholder="https://..."
+                    />
+                    <label className="cursor-pointer p-3 rounded-xl bg-white/5 border border-white/10 text-gold hover:bg-gold hover:text-black transition-all flex items-center justify-center min-w-[48px]">
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        onChange={(e) => handleSoloFileUpload(e, 'art', 'playlist')} 
+                        className="hidden" 
+                        disabled={!!isUploadingFile}
+                      />
+                      {isUploadingFile?.field === 'art' ? <Loader2 size={16} className="animate-spin" /> : <ImageIcon size={16} />}
+                    </label>
+                  </div>
                 </div>
                 <div className="md:col-span-2">
                   <label className="block text-[10px] uppercase tracking-widest text-zinc-500 mb-2">Description</label>
@@ -1174,7 +1699,19 @@ export const AdminDashboard: React.FC = () => {
               </div>
 
               <div className="mb-6">
-                <label className="block text-[10px] uppercase tracking-widest text-zinc-500 mb-4">Select Tracks ({newPlaylist.trackIds.length})</label>
+                <div className="flex items-center gap-4 py-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input 
+                      type="checkbox"
+                      checked={newPlaylist.isPublic}
+                      onChange={(e) => setNewPlaylist({ ...newPlaylist, isPublic: e.target.checked })}
+                      className="w-4 h-4 rounded border-white/10 bg-white/5 text-gold focus:ring-gold"
+                    />
+                    <span className="text-[10px] uppercase tracking-widest text-zinc-400">Public for all users</span>
+                  </label>
+                </div>
+
+                <label className="block text-[10px] uppercase tracking-widest text-zinc-500 mb-4">Select Tracks ({newPlaylist.trackIds?.length || 0})</label>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 max-h-64 overflow-y-auto pr-2 custom-scrollbar">
                   {media.filter(m => m.type === 'audio').map(track => (
                     <button
@@ -1193,7 +1730,7 @@ export const AdminDashboard: React.FC = () => {
                           : 'bg-white/5 border-white/10 text-zinc-400 hover:border-white/20'
                       }`}
                     >
-                      <img src={track.art} alt="" className="w-10 h-10 rounded-lg object-cover" />
+                      <img src={track.art || '/src/assets/images/default_cover_1779345608057.png'} alt="" className="w-10 h-10 rounded-lg object-cover" referrerPolicy="no-referrer" />
                       <div className="flex-1 min-w-0">
                         <p className="text-[10px] font-bold truncate">{track.title}</p>
                         <p className="text-[8px] uppercase tracking-tight opacity-50 truncate">{track.genre.join(', ')}</p>
@@ -1228,10 +1765,16 @@ export const AdminDashboard: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {playlists.map(playlist => (
               <div key={playlist.id} className="glass-panel p-4 rounded-2xl flex items-center gap-4 group">
-                <img src={playlist.art || 'https://picsum.photos/seed/playlist/200/200'} alt="" className="w-16 h-16 rounded-xl object-cover" />
+                <img src={playlist.art || '/src/assets/images/default_cover_1779345608057.png'} alt="" className="w-16 h-16 rounded-xl object-cover" referrerPolicy="no-referrer" />
                 <div className="flex-1 min-w-0">
                   <h3 className="text-white text-sm font-display truncate">{playlist.title}</h3>
-                  <p className="text-[10px] text-zinc-500 uppercase tracking-widest">{playlist.trackIds?.length || 0} Tracks</p>
+                  <div className="flex flex-col gap-0.5">
+                    <p className="text-[10px] text-zinc-500 uppercase tracking-widest">{playlist.trackIds?.length || 0} Tracks</p>
+                    <div className="flex items-center gap-1 text-[8px] text-zinc-600 uppercase tracking-widest">
+                      {playlist.isPublic ? <Globe size={8} className="text-gold" /> : <Lock size={8} />}
+                      <span>{playlist.isPublic ? 'Public' : 'Private'}</span>
+                    </div>
+                  </div>
                 </div>
                 <div className="flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                   <button 
@@ -1267,6 +1810,179 @@ export const AdminDashboard: React.FC = () => {
               </div>
             ))}
           </div>
+        </section>
+
+        {/* Merch Store Management */}
+        <section className="surface-panel rounded-3xl p-6 lg:col-span-2">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3">
+              <ShoppingBag className="text-gold" size={20} />
+              <h2 className="text-xl font-display text-[var(--text-primary)]">Merch Store Artifacts</h2>
+            </div>
+            <div className="flex gap-2">
+              <button 
+                onClick={seedProducts}
+                disabled={isMigrating}
+                className="flex items-center gap-2 px-6 py-2 rounded-xl border border-gold/30 bg-gold/5 text-gold hover:bg-gold/10 transition-all text-[10px] font-bold uppercase tracking-widest disabled:opacity-50"
+              >
+                {isMigrating ? <Loader2 size={14} className="animate-spin" /> : <ShoppingBag size={14} />}
+                Seed Store Library
+              </button>
+              <button 
+                onClick={() => setShowProductForm(!showProductForm)}
+                className={`flex items-center gap-2 px-6 py-2 rounded-xl border transition-all text-[10px] font-bold uppercase tracking-widest ${
+                  showProductForm ? 'bg-gold text-black border-gold' : 'bg-white/5 border-white/10 text-gold hover:bg-white/10'
+                }`}
+              >
+                {showProductForm ? <X size={14} /> : <Plus size={14} />}
+                {showProductForm ? 'Cancel' : 'Add Product'}
+              </button>
+            </div>
+          </div>
+
+          {showProductForm && (
+            <motion.div 
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              className="mb-8 p-6 rounded-2xl bg-white/5 border border-white/10"
+            >
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div>
+                  <label className="block text-[10px] uppercase tracking-widest text-zinc-500 mb-2">Product Name</label>
+                  <input 
+                    type="text"
+                    value={newProduct.name}
+                    onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-gold"
+                    placeholder="E.g., Quantum resonance Hoodie"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] uppercase tracking-widest text-zinc-500 mb-2">Price ($)</label>
+                  <input 
+                    type="number"
+                    value={newProduct.price}
+                    onChange={(e) => setNewProduct({ ...newProduct, price: parseFloat(e.target.value) })}
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-gold"
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-[10px] uppercase tracking-widest text-zinc-500 mb-2">Description</label>
+                  <textarea 
+                    value={newProduct.description}
+                    onChange={(e) => setNewProduct({ ...newProduct, description: e.target.value })}
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-gold h-24"
+                    placeholder="Describe the material and frequency of this artifact..."
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] uppercase tracking-widest text-zinc-500 mb-2">Category</label>
+                  <select 
+                    value={newProduct.category}
+                    onChange={(e) => setNewProduct({ ...newProduct, category: e.target.value })}
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-zinc-400 outline-none focus:border-gold"
+                  >
+                    <option value="Apparel">Apparel</option>
+                    <option value="Accessories">Accessories</option>
+                    <option value="Digital">Digital</option>
+                    <option value="Vinyl">Vinyl</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] uppercase tracking-widest text-zinc-500 mb-2">Stock Level</label>
+                  <input 
+                    type="number"
+                    value={newProduct.stock}
+                    onChange={(e) => setNewProduct({ ...newProduct, stock: parseInt(e.target.value) })}
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-gold"
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-[10px] uppercase tracking-widest text-zinc-500 mb-2">Image URL</label>
+                  <div className="flex gap-2">
+                    <input 
+                      type="text"
+                      value={newProduct.images?.[0] || ''}
+                      onChange={(e) => setNewProduct({ ...newProduct, images: [e.target.value] })}
+                      className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-gold"
+                      placeholder="https://..."
+                    />
+                    <label className="cursor-pointer p-3 rounded-xl bg-white/5 border border-white/10 text-gold hover:bg-gold hover:text-black transition-all flex items-center justify-center min-w-[48px]">
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        onChange={(e) => handleSoloFileUpload(e, 'images', 'product')} 
+                        className="hidden" 
+                        disabled={!!isUploadingFile}
+                      />
+                      {isUploadingFile?.field === 'images' ? <Loader2 size={16} className="animate-spin" /> : <ImageIcon size={16} />}
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-4">
+                <button 
+                  onClick={() => {
+                    setShowProductForm(false);
+                    setEditingProductId(null);
+                  }}
+                  className="px-6 py-2 rounded-xl bg-white/5 text-zinc-500 text-[10px] font-bold uppercase tracking-widest hover:bg-white/10 transition-all"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={handleSaveProduct}
+                  disabled={isSaving || !newProduct.name || !newProduct.price}
+                  className="px-8 py-2 rounded-xl gold-gradient text-black text-[10px] font-bold uppercase tracking-widest hover:scale-105 transition-all disabled:opacity-50"
+                >
+                  {isSaving ? 'Processing...' : editingProductId ? 'Update Product' : 'Add Artifact'}
+                </button>
+              </div>
+            </motion.div>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {products.map(product => (
+              <div key={product.id} className="glass-panel p-4 rounded-2xl group relative overflow-hidden">
+                <div className="aspect-square bg-zinc-900 rounded-xl overflow-hidden mb-4">
+                  <img src={product.images[0]} alt="" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                </div>
+                <div className="flex justify-between items-start mb-1">
+                  <h3 className="text-white text-xs font-bold uppercase tracking-widest truncate">{product.name}</h3>
+                  <span className="text-gold font-bold text-xs">${product.price.toFixed(2)}</span>
+                </div>
+                <div className="flex items-center justify-between mt-4">
+                  <span className="text-[8px] uppercase tracking-widest text-zinc-500">{product.category} • {product.stock} in stock</span>
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => {
+                        setNewProduct(product);
+                        setEditingProductId(product.id);
+                        setShowProductForm(true);
+                      }}
+                      className="p-1.5 rounded-lg bg-white/5 text-zinc-500 hover:text-gold transition-colors"
+                    >
+                      <Save size={12} />
+                    </button>
+                    <button 
+                      onClick={() => handleDeleteProduct(product.id)}
+                      className="p-1.5 rounded-lg bg-white/5 text-zinc-600 hover:text-red-500 transition-colors"
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {products.length === 0 && (
+            <div className="p-12 text-center border border-dashed border-white/10 rounded-3xl">
+              <ShoppingBag className="mx-auto text-zinc-800 mb-4" size={32} />
+              <p className="text-zinc-600 text-[10px] uppercase tracking-widest">No artifacts in the store repository</p>
+            </div>
+          )}
         </section>
 
         {/* CRM Overview */}

@@ -1,7 +1,8 @@
 import React, { useMemo } from 'react';
 import { motion } from 'motion/react';
-import { Sparkles, RefreshCw, Hash, Book } from 'lucide-react';
+import { Sparkles, RefreshCw, Hash, Book, Volume2, Pause, Loader2 } from 'lucide-react';
 import { KabbalahLetterology, LetterFrequencyAnalysis } from '../services/letterologyService';
+import { useAudioNarrator } from '../hooks/useAudioNarrator';
 
 interface GematriaToolProps {
   userData: { name: string; birthDate: string };
@@ -12,6 +13,15 @@ export const GematriaTool: React.FC<GematriaToolProps> = ({ userData, onReset })
   const gematria = useMemo(() => KabbalahLetterology.calculateGematria(userData.name), [userData.name]);
   const treePath = useMemo(() => KabbalahLetterology.calculateTreePath(userData.name), [userData.name]);
   const resonance = useMemo(() => LetterFrequencyAnalysis.calculateResonance(userData.name), [userData.name]);
+  const { isPlaying, audioLoading, toggleData } = useAudioNarrator();
+
+  const handleToggleAudio = () => {
+    toggleData(`Gematria Signal Analysis for ${userData.name}`, {
+      gematria,
+      treePath,
+      resonance
+    });
+  };
 
   return (
     <div className="glass-panel p-8 md:p-12 rounded-[2.5rem] relative overflow-hidden">
@@ -27,9 +37,23 @@ export const GematriaTool: React.FC<GematriaToolProps> = ({ userData, onReset })
             <p className="text-[10px] text-zinc-500 uppercase tracking-[0.3em]">Numerical Resonance System</p>
           </div>
         </div>
-        <button onClick={onReset} className="p-2 rounded-lg bg-white/5 text-zinc-500 hover:text-gold transition-colors">
-          <RefreshCw size={16} />
-        </button>
+        <div className="flex gap-2">
+          <button 
+            onClick={handleToggleAudio}
+            disabled={audioLoading}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl border transition-all text-[10px] uppercase tracking-widest font-bold ${
+              isPlaying 
+              ? 'bg-gold text-black border-gold shadow-[0_0_20px_rgba(201,168,76,0.2)]' 
+              : 'bg-gold/10 text-gold border-gold/20 hover:bg-gold/20'
+            }`}
+          >
+            {audioLoading ? <Loader2 size={12} className="animate-spin" /> : isPlaying ? <Pause size={12} /> : <Volume2 size={12} />}
+            {isPlaying ? 'Stop' : 'Briefing'}
+          </button>
+          <button onClick={onReset} className="p-2 rounded-lg bg-white/5 text-zinc-500 hover:text-gold transition-colors">
+            <RefreshCw size={16} />
+          </button>
+        </div>
       </div>
 
       <div className="grid md:grid-cols-2 gap-12">

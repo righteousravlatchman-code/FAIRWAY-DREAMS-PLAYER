@@ -6,7 +6,7 @@ export const TRACKS: Track[] = [
     title: "The Book of Rav",
     type: 'audio',
     playlist: "The Book of Rav",
-    art: "https://cdn2.suno.ai/b73643b5.jpeg",
+    art: "/src/assets/images/default_cover_1779345608057.png",
     url: "https://suno.com/playlist/0677708d-d02e-455a-b43c-851d8c5e85a1",
     mediaUrl: "https://cdn.pixabay.com/audio/2022/03/10/audio_c8c8a73456.mp3",
     genre: ['consciousness', 'hip-hop', 'r&b'],
@@ -20,7 +20,7 @@ export const TRACKS: Track[] = [
     title: "// SPI Physics //",
     type: 'audio',
     playlist: "SPI Physics",
-    art: "https://cdn2.suno.ai/560ef12a.jpeg",
+    art: "/src/assets/images/default_cover_1779345608057.png",
     url: "https://suno.com/playlist/fe650ac6-a142-4583-ab07-8787e69d2ca1",
     mediaUrl: "https://cdn.pixabay.com/audio/2022/01/18/audio_d0a13f69d2.mp3",
     genre: ['education', 'physics'],
@@ -34,7 +34,7 @@ export const TRACKS: Track[] = [
     title: "BETTER",
     type: 'audio',
     playlist: "BETTER",
-    art: "https://cdn2.suno.ai/6d506dc4.jpeg",
+    art: "/src/assets/images/default_cover_1779345608057.png",
     url: "https://suno.com/playlist/553e2bff-ba16-46a9-8525-036074fb896c",
     mediaUrl: "https://cdn.pixabay.com/audio/2021/11/25/audio_91b132f0fc.mp3",
     genre: ['vibes', 'motivation'],
@@ -48,7 +48,7 @@ export const TRACKS: Track[] = [
     title: "// SPI Physics // Extended",
     type: 'audio',
     playlist: "SPI Physics Extended",
-    art: "https://cdn2.suno.ai/015804fd.jpeg",
+    art: "/src/assets/images/default_cover_1779345608057.png",
     url: "https://suno.com/playlist/064abc81-e9f5-4f88-b25c-3889d4952be4",
     mediaUrl: "https://cdn.pixabay.com/audio/2022/03/15/audio_69b5f2107a.mp3",
     genre: ['education', 'physics'],
@@ -62,7 +62,7 @@ export const TRACKS: Track[] = [
     title: "Fairway Dreams",
     type: 'audio',
     playlist: "Fairway Dreams",
-    art: "https://picsum.photos/seed/fairway-dreams/800/800",
+    art: "/src/assets/images/default_cover_1779345608057.png",
     url: "https://suno.com/song/fairway-dreams",
     mediaUrl: "https://cdn.pixabay.com/audio/2022/02/22/audio_d1718ab41b.mp3",
     genre: ['lo-fi', 'synthwave', 'chill'],
@@ -104,5 +104,11 @@ export const THEMES = {
     secondary: '#4b0082',
     accent: '#39ff14',
     glow: 'rgba(255, 0, 255, 0.5)'
+  },
+  day: {
+    primary: '#000000', // Black
+    secondary: '#f5f5dc', // Cream
+    accent: '#333333', // Dark Gray
+    glow: 'rgba(0, 0, 0, 0.2)'
   }
 };

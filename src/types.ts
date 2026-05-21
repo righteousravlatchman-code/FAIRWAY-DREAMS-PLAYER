@@ -41,7 +41,7 @@ export interface Playlist {
   updatedAt?: any;
 }
 
-export type VisualizerMode = 'bars' | 'wave' | 'radial' | 'particles' | 'mirror' | 'scope';
+export type VisualizerMode = 'bars' | 'wave' | 'radial' | 'particles' | 'mirror' | 'scope' | 'tunnel' | 'nebula' | 'vortex' | 'matrix' | 'kaleidoscope';
 
 export interface ThemeColors {
   primary: string;
@@ -89,4 +89,40 @@ export interface UserProfile {
     vizSettings: VisualizerSettings;
   };
   updatedAt?: string;
+}
+
+export interface Product {
+  id: string;
+  name: string;
+  description: string;
+  price: number;
+  category: string;
+  images: string[];
+  stock: number;
+  sizes?: string[];
+  colors?: string[];
+  features?: string[];
+  createdAt: any;
+}
+
+export interface CartItem extends Product {
+  quantity: number;
+  selectedSize?: string;
+  selectedColor?: string;
+}
+
+export interface Order {
+  id: string;
+  userId: string;
+  items: CartItem[];
+  total: number;
+  status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
+  shippingAddress: {
+    name: string;
+    email: string;
+    address: string;
+    city: string;
+    zip: string;
+  };
+  createdAt: any;
 }

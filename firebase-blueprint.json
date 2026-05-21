@@ -142,6 +142,38 @@
         "timestamp": { "type": "object" }
       },
       "required": ["contactId", "type", "timestamp"]
+    },
+    "Product": {
+      "title": "Product",
+      "description": "A merchandise item in the store.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "price": { "type": "number" },
+        "category": { "type": "string" },
+        "images": { "type": "array", "items": { "type": "string" } },
+        "stock": { "type": "number" },
+        "sizes": { "type": "array", "items": { "type": "string" } },
+        "colors": { "type": "array", "items": { "type": "string" } },
+        "features": { "type": "array", "items": { "type": "string" } },
+        "createdAt": { "type": "object" }
+      },
+      "required": ["name", "price", "category", "images", "stock"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "A customer order for merchandise.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "items": { "type": "array", "items": { "type": "object" } },
+        "total": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "processing", "shipped", "delivered", "cancelled"] },
+        "shippingAddress": { "type": "object" },
+        "createdAt": { "type": "object" }
+      },
+      "required": ["userId", "items", "total", "status", "shippingAddress"]
     }
   },
   "firestore": {
@@ -180,6 +212,14 @@
     "interactions/{interactionId}": {
       "schema": "Interaction",
       "description": "Collection of CRM interactions."
+    },
+    "products/{productId}": {
+      "schema": "Product",
+      "description": "Collection of store products."
+    },
+    "orders/{orderId}": {
+      "schema": "Order",
+      "description": "Collection of customer orders."
     }
   }
 }
