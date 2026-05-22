@@ -296,16 +296,16 @@ export function useAudioPlayer(onEnded?: () => void) {
           console.log("Playback succeeded after CORS-disabled retry");
         } catch (retryErr: any) {
           console.error("Retry failed:", retryErr);
-          if (retryErr.name !== 'NotAllowedError' && retryErr.name !== 'AbortError') {
+          if (retryErr?.name !== 'NotAllowedError' && retryErr?.name !== 'AbortError') {
             setIsPlaying(false);
             // More user-friendly error
-            const detail = a.error?.message || retryErr.message || "Unknown load error";
+            const detail = a.error?.message || retryErr?.message || "Unknown load error";
             setError(`Playback Error: ${detail}. The source might be restricted or invalid.`);
           }
         }
-      } else if (err.name !== 'NotAllowedError' && err.name !== 'AbortError') {
+      } else if (err?.name !== 'NotAllowedError' && err?.name !== 'AbortError') {
         setIsPlaying(false);
-        setError(`Playback failed: ${err.message || "Unknown error"}`);
+        setError(`Playback failed: ${err?.message || "Unknown error"}`);
       }
     } finally {
       setIsLoading(false);

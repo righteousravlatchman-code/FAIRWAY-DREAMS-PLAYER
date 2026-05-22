@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Music, Play, Heart, Save, Plus, Sparkles } from 'lucide-react';
+import { Music, Play, Heart, Save, Plus, Sparkles, Share2 } from 'lucide-react';
 import { Track, Playlist } from '../types';
+import { ShareButtons } from './ShareButtons';
 
 interface TrackListProps {
   tracks: Track[];
@@ -23,6 +24,7 @@ export const TrackList: React.FC<TrackListProps> = ({
   onAddToPlaylist
 }) => {
   const [activePickerId, setActivePickerId] = useState<string | null>(null);
+  const [activeShareId, setActiveShareId] = useState<string | null>(null);
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-12">
@@ -53,10 +55,10 @@ export const TrackList: React.FC<TrackListProps> = ({
             whileInView={{ opacity: 1, x: 0 }}
             transition={{ delay: idx * 0.1 }}
             onClick={() => onSelect(track)}
-            className={`group relative flex items-center gap-3 md:gap-6 p-3 md:p-4 rounded-xl md:rounded-2xl border transition-all cursor-pointer hover-zoom ${
+            className={`group relative flex items-center gap-3 md:gap-6 p-3 md:p-4 rounded-xl md:rounded-2xl border transition-all cursor-pointer hover-zoom backdrop-blur-md ${
               currentTrackId === track.id 
-                ? 'bg-gold/10 border-gold/30 shadow-lg shadow-gold/5' 
-                : 'bg-[var(--panel-bg)] border-[var(--panel-border)] hover:bg-white/10 hover:border-white/10'
+                ? 'bg-gold/15 border-gold/40 shadow-[0_0_30px_-5px_rgba(201,168,76,0.3)]' 
+                : 'bg-[var(--panel-bg)] border-[var(--panel-border)] hover:bg-white/10 hover:border-white/20'
             }`}
           >
             <span className={`font-display text-[10px] md:text-xs w-6 text-center ${currentTrackId === track.id ? 'text-gold' : 'text-[var(--text-secondary)]'}`}>
@@ -117,7 +119,7 @@ export const TrackList: React.FC<TrackListProps> = ({
                     setActivePickerId(activePickerId === track.id ? null : track.id);
                   }}
                   className={`p-3 md:p-2 rounded-lg hover:bg-white/10 active:scale-90 transition-all ${activePickerId === track.id ? 'text-gold bg-white/10' : 'text-[var(--text-secondary)]'}`}
-                  title="Add to Vault"
+                  title="Add to Playlist"
                 >
                   <Plus size={18} className="md:w-4 md:h-4" />
                 </button>
@@ -139,7 +141,7 @@ export const TrackList: React.FC<TrackListProps> = ({
                         className="absolute bottom-full right-0 mb-2 w-48 bg-zinc-900/95 backdrop-blur-xl border border-white/10 rounded-xl p-2 z-50 shadow-2xl"
                         onClick={e => e.stopPropagation()}
                       >
-                        <h5 className="text-[7px] uppercase tracking-widest text-zinc-500 mb-2 px-2 py-1 border-b border-white/5">Save to Vault</h5>
+                        <h5 className="text-[7px] uppercase tracking-widest text-zinc-500 mb-2 px-2 py-1 border-b border-white/5">Save to Playlist</h5>
                         <div className="flex flex-col gap-0.5 max-h-32 overflow-y-auto pr-1 custom-scrollbar">
                           {playlists.length > 0 ? (
                             playlists.map(playlist => {
@@ -159,9 +161,49 @@ export const TrackList: React.FC<TrackListProps> = ({
                               );
                             })
                           ) : (
-                            <p className="text-[7px] text-zinc-600 text-center py-2 px-2">No vaults found.</p>
+                            <p className="text-[7px] text-zinc-600 text-center py-2 px-2">No playlists found.</p>
                           )}
                         </div>
+                      </motion.div>
+                    </>
+                  )}
+                </AnimatePresence>
+              </div>
+
+              <div className="relative">
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setActiveShareId(activeShareId === track.id ? null : track.id);
+                  }}
+                  className={`p-3 md:p-2 rounded-lg hover:bg-white/10 active:scale-90 transition-all ${activeShareId === track.id ? 'text-gold bg-white/10' : 'text-[var(--text-secondary)]'}`}
+                  title="Share Track"
+                >
+                  <Share2 size={18} className="md:w-4 md:h-4" />
+                </button>
+
+                <AnimatePresence>
+                  {activeShareId === track.id && (
+                    <>
+                      <div 
+                        className="fixed inset-0 z-40" 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActiveShareId(null);
+                        }} 
+                      />
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.9, x: 10, y: -10 }}
+                        animate={{ opacity: 1, scale: 1, x: 0, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.9, x: 10, y: -10 }}
+                        className="absolute bottom-full right-0 mb-2 bg-zinc-900/95 backdrop-blur-xl border border-white/10 rounded-xl p-2 z-50 shadow-2xl"
+                        onClick={e => e.stopPropagation()}
+                      >
+                         <ShareButtons 
+                           url={window.location.origin + `/?track=${track.id}`}
+                           title={track.title}
+                           type="track"
+                         />
                       </motion.div>
                     </>
                   )}

@@ -41,7 +41,7 @@ export interface Playlist {
   updatedAt?: any;
 }
 
-export type VisualizerMode = 'bars' | 'wave' | 'radial' | 'particles' | 'mirror' | 'scope' | 'tunnel' | 'nebula' | 'vortex' | 'matrix' | 'kaleidoscope';
+export type VisualizerMode = 'bars' | 'wave' | 'radial' | 'particles' | 'mirror' | 'scope' | 'tunnel' | 'nebula' | 'vortex' | 'matrix' | 'kaleidoscope' | 'liquid' | 'dna' | 'galaxy' | 'atom' | 'blackhole' | 'constellation';
 
 export interface ThemeColors {
   primary: string;
@@ -80,6 +80,7 @@ export interface UserProfile {
   hebrewName?: string;
   bio: string;
   avatar: string;
+  mascot?: string;
   role: 'admin' | 'user';
   likedTrackIds: string[];
   savedInsights: SavedInsight[];

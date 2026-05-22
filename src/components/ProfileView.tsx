@@ -251,6 +251,19 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                   <option value="light" className="bg-white text-black">Light Mode</option>
                 </select>
               </div>
+
+              <div className="p-4 rounded-xl bg-white/5 border border-white/5">
+                <p className="text-[10px] uppercase tracking-widest text-[var(--text-secondary)] mb-2">Spirit Guide (Mascot)</p>
+                <select 
+                  value={profile.mascot || 'none'}
+                  onChange={(e) => onUpdateProfile({ mascot: e.target.value })}
+                  className="w-full bg-transparent text-[var(--text-primary)] text-xs capitalize outline-none cursor-pointer"
+                >
+                  <option value="none" className="bg-black text-white">None (Disabled)</option>
+                  <option value="owl" className="bg-black text-white">The Cosmic Owl</option>
+                  <option value="fox" className="bg-black text-white">The Astral Fox</option>
+                </select>
+              </div>
             </div>
           </div>
         </div>
@@ -402,13 +415,13 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             <div className="flex items-center justify-between mb-8">
               <div className="flex items-center gap-3">
                 <Music size={20} className="text-gold" />
-                <h3 className="font-display text-xl text-white tracking-widest uppercase">Curation Vaults</h3>
+                <h3 className="font-display text-xl text-white tracking-widest uppercase">Curation Playlists</h3>
               </div>
               <button 
                 onClick={() => setShowCreatePlaylist(true)}
                 className="flex items-center gap-2 px-4 py-2 rounded-full bg-gold/10 border border-gold/20 text-gold text-[10px] uppercase tracking-widest hover:bg-gold/20 transition-all"
               >
-                <Plus size={14} /> New Vault
+                <Plus size={14} /> New Playlist
               </button>
             </div>
 
@@ -422,7 +435,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                 >
                   <div className="flex flex-col md:flex-row gap-4 items-end">
                     <div className="flex-1 space-y-2 w-full">
-                      <label className="text-[8px] uppercase tracking-widest text-zinc-500">Vault Name</label>
+                      <label className="text-[8px] uppercase tracking-widest text-zinc-500">Playlist Name</label>
                       <input 
                         type="text"
                         value={newPlaylistName}

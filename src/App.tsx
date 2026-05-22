@@ -77,6 +77,8 @@ const INITIAL_PROFILE: UserProfile = {
   }
 };
 
+import { MascotGuide } from './components/MascotGuide';
+
 export default function App() {
   const [activeTab, setActiveTab] = useState('home');
   const [activeTool, setActiveTool] = useState('numerology');
@@ -188,12 +190,21 @@ export default function App() {
     const unsubscribeProfile = onSnapshot(userDocRef, (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
+        const effectiveRole = user.email === 'righteousravlatchman@gmail.com' ? 'admin' : (data.role || 'user');
+        
         setProfile(prev => ({
           ...prev,
           ...data,
+          role: effectiveRole,
           likedTrackIds: data.likedTrackIds || data.favoriteTrackIds || [],
           settings: data.settings || prev.settings
         }));
+
+        if (user.email === 'righteousravlatchman@gmail.com' && data.role !== 'admin') {
+          updateDoc(userDocRef, { role: 'admin' }).catch(err => 
+            console.error("Error setting admin role:", err)
+          );
+        }
 
         if (data.settings?.vizSettings) {
           setVizSettings(data.settings.vizSettings);
@@ -418,7 +429,7 @@ Plant conceptual seeds now for action in his next personal year. Present thought
         updatedAt: new Date().toISOString()
       };
       await addDoc(collection(db, 'playlists'), newPlaylist);
-      showToast('Vault created successfully', 'success');
+      showToast('Playlist created successfully', 'success');
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, 'playlists');
     }
@@ -427,7 +438,7 @@ Plant conceptual seeds now for action in his next personal year. Present thought
   const handleDeletePlaylist = useCallback(async (id: string) => {
     try {
       await deleteDoc(doc(db, 'playlists', id));
-      showToast('Vault deleted', 'success');
+      showToast('Playlist deleted', 'success');
     } catch (error) {
       handleFirestoreError(error, OperationType.DELETE, `playlists/${id}`);
     }
@@ -449,7 +460,7 @@ Plant conceptual seeds now for action in his next personal year. Present thought
     if (!playlist) return;
     
     if (playlist.trackIds.includes(trackId)) {
-      showToast('Track already in vault', 'info');
+      showToast('Track already in playlist', 'info');
       return;
     }
 
@@ -458,7 +469,7 @@ Plant conceptual seeds now for action in his next personal year. Present thought
         trackIds: [...playlist.trackIds, trackId],
         updatedAt: new Date().toISOString()
       });
-      showToast('Track added to vault', 'success');
+      showToast('Track added to playlist', 'success');
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, `playlists/${playlistId}`);
     }
@@ -473,7 +484,7 @@ Plant conceptual seeds now for action in his next personal year. Present thought
         trackIds: playlist.trackIds.filter(id => id !== trackId),
         updatedAt: new Date().toISOString()
       });
-      showToast('Track removed from vault', 'success');
+      showToast('Track removed from playlist', 'success');
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, `playlists/${playlistId}`);
     }
@@ -975,9 +986,21 @@ Plant conceptual seeds now for action in his next personal year. Present thought
               <section className="relative min-h-[85vh] md:min-h-[90vh] flex flex-col items-center justify-center text-center section-padding overflow-hidden">
                 <motion.div 
                   style={{ y: heroY, opacity: heroOpacity }}
-                  className="absolute inset-0 bg-[radial-gradient(circle_at_50%_40%,rgba(201,168,76,0.08),transparent_70%)]" 
+                  className="absolute inset-0 bg-[radial-gradient(circle_at_50%_40%,rgba(201,168,76,0.15),transparent_60%)]" 
                 />
                 
+                {/* Ambient glowing orbs */}
+                <motion.div 
+                  className="absolute top-[20%] left-[20%] w-64 h-64 bg-gold/10 rounded-full blur-[100px]"
+                  animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.6, 0.3] }}
+                  transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+                />
+                <motion.div 
+                  className="absolute bottom-[20%] right-[20%] w-96 h-96 bg-zinc-700/20 rounded-full blur-[120px]"
+                  animate={{ scale: [1, 1.3, 1], opacity: [0.2, 0.5, 0.2] }}
+                  transition={{ duration: 10, repeat: Infinity, ease: "easeInOut", delay: 2 }}
+                />
+
                 <motion.div
                   initial={{ scale: 0.9, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
@@ -1774,6 +1797,8 @@ Plant conceptual seeds now for action in his next personal year. Present thought
           </p>
         </div>
       </footer>
+
+      {profile && <MascotGuide mascotType={profile.mascot} />}
     </div>
   );
 }

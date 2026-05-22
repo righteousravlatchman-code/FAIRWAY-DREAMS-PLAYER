@@ -76,39 +76,39 @@ export const TRACKS: Track[] = [
 
 export const THEMES = {
   gold: {
-    primary: '#c9a84c',
-    secondary: '#8a6a1e',
-    accent: '#f0d080',
-    glow: 'rgba(201, 168, 76, 0.5)'
+    primary: '#d4af37', // Deeper rich gold
+    secondary: '#aa8024',
+    accent: '#fdfbf7', // Brighter peak
+    glow: 'rgba(212, 175, 55, 0.6)'
   },
   blue: {
-    primary: '#4fc3f7',
-    secondary: '#0077b6',
-    accent: '#e1f5fe',
-    glow: 'rgba(79, 195, 247, 0.5)'
+    primary: '#00f0ff', // Cyber cyan
+    secondary: '#0055ff', // Deep neon blue
+    accent: '#ffffff',
+    glow: 'rgba(0, 240, 255, 0.6)'
   },
   violet: {
-    primary: '#a78bfa',
-    secondary: '#6d28d9',
-    accent: '#ede9fe',
-    glow: 'rgba(167, 139, 250, 0.5)'
+    primary: '#b026ff', // Neon purple
+    secondary: '#5c0099',
+    accent: '#f4dbff',
+    glow: 'rgba(176, 38, 255, 0.6)'
   },
   emerald: {
-    primary: '#34d399',
-    secondary: '#065f46',
-    accent: '#ecfdf5',
-    glow: 'rgba(52, 211, 153, 0.5)'
+    primary: '#00ff88', // Toxic green
+    secondary: '#004d26',
+    accent: '#d9ffe8',
+    glow: 'rgba(0, 255, 136, 0.6)'
   },
   cyberpunk: {
-    primary: '#ff00ff',
-    secondary: '#4b0082',
-    accent: '#39ff14',
-    glow: 'rgba(255, 0, 255, 0.5)'
+    primary: '#ff0055', // Hot neon pink
+    secondary: '#4b0082', // Deep indigo
+    accent: '#00ffcc', // Cyber teal
+    glow: 'rgba(255, 0, 85, 0.6)'
   },
   day: {
-    primary: '#000000', // Black
-    secondary: '#f5f5dc', // Cream
-    accent: '#333333', // Dark Gray
-    glow: 'rgba(0, 0, 0, 0.2)'
+    primary: '#111111', 
+    secondary: '#e5e5d3', 
+    accent: '#ffffff', 
+    glow: 'rgba(17, 17, 17, 0.3)'
   }
 };

@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Send, Users, Activity, MessageSquare, Shield, Zap, Sparkles, Radio, PlayCircle, Play, Square } from 'lucide-react';
+import { Send, Users, Activity, MessageSquare, Shield, Zap, Sparkles, Radio, PlayCircle, Play, Square, Mic } from 'lucide-react';
 import { db, auth, collection, query, orderBy, limit, onSnapshot, addDoc, serverTimestamp } from '../firebase';
 import { Track, UserProfile, LiveMessage } from '../types';
+import { LiveRiffCapture } from './LiveRiffCapture';
 
 interface LiveStageProps {
   currentTrack: Track;
@@ -16,6 +17,7 @@ export const LiveStage: React.FC<LiveStageProps> = ({ currentTrack, user, profil
   const [viewersCount, setViewersCount] = useState(0);
   const [selectedFreq, setSelectedFreq] = useState<number | null>(null);
   const [activeFrequencyId, setActiveFrequencyId] = useState<string | null>(null);
+  const [isPlayingMidi, setIsPlayingMidi] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -109,6 +111,43 @@ export const LiveStage: React.FC<LiveStageProps> = ({ currentTrack, user, profil
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  const playMidiSequence = (notes: number[]) => {
+    if (!notes || !notes.length) return;
+    if (!audioContextRef.current) {
+      audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+    }
+    const ctx = audioContextRef.current;
+    if (ctx.state === 'suspended') ctx.resume();
+    
+    setIsPlayingMidi(true);
+    let startTime = ctx.currentTime + 0.1;
+    
+    notes.forEach((note) => {
+      if (note > 0) {
+        const hz = 440 * Math.pow(2, (note - 69) / 12);
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        
+        osc.type = 'triangle';
+        osc.frequency.value = hz;
+        
+        gain.gain.setValueAtTime(0, startTime);
+        gain.gain.linearRampToValueAtTime(0.2, startTime + 0.05);
+        gain.gain.linearRampToValueAtTime(0, startTime + 0.25);
+        
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        
+        osc.start(startTime);
+        osc.stop(startTime + 0.3);
+      }
+      
+      startTime += 0.25;
+    });
+
+    setTimeout(() => setIsPlayingMidi(false), (startTime - ctx.currentTime) * 1000);
+  };
+
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!messageText.trim() || !user || !currentTrack.id) return;
@@ -130,6 +169,24 @@ export const LiveStage: React.FC<LiveStageProps> = ({ currentTrack, user, profil
       setSelectedFreq(null);
     } catch (error) {
       console.error("Error sending message:", error);
+    }
+  };
+
+  const handleCaptureRiff = async (midiData: number[], annotation?: string) => {
+    if (!user || !currentTrack.id) return;
+    try {
+      const msgData: any = {
+        userId: user.uid,
+        userName: profile.name || 'Seeker',
+        userHebrewName: profile.hebrewName || '',
+        userAvatar: profile.avatar || '',
+        text: annotation ? `Captured Live Riff: ${annotation}` : `Captured a Live Sequence`,
+        midiData: midiData,
+        timestamp: serverTimestamp()
+      };
+      await addDoc(collection(db, 'live_chat', currentTrack.id, 'messages'), msgData);
+    } catch (error) {
+      console.error("Error sending riff message:", error);
     }
   };
 
@@ -158,20 +215,32 @@ export const LiveStage: React.FC<LiveStageProps> = ({ currentTrack, user, profil
                 
                 {/* Simulating Pulse Visualizer */}
                 <div className="absolute inset-0 flex items-center justify-center overflow-hidden">
+                    <AnimatePresence>
+                      {isPlayingMidi && (
+                        <motion.div
+                          initial={{ opacity: 0, scale: 0.8 }}
+                          animate={{ opacity: 0.3, scale: 1.5 }}
+                          exit={{ opacity: 0, scale: 2 }}
+                          transition={{ duration: 0.5 }}
+                          className="absolute inset-0 bg-[radial-gradient(circle,rgba(201,168,76,0.3)_0%,transparent_70%)] pointer-events-none"
+                        />
+                      )}
+                    </AnimatePresence>
                     {[...Array(5)].map((_, i) => (
                       <motion.div
                         key={i}
-                        className="absolute border border-gold/20 rounded-full"
+                        className={`absolute border rounded-full ${isPlayingMidi ? 'border-gold/40' : 'border-gold/20'}`}
                         initial={{ width: 100, height: 100, opacity: 0.5 }}
                         animate={{ 
                           width: [100, 800], 
                           height: [100, 800], 
-                          opacity: [0.5, 0] 
+                          opacity: [0.5, 0],
+                          rotate: isPlayingMidi ? [0, 90] : 0
                         }}
                         transition={{ 
-                          duration: 4, 
+                          duration: isPlayingMidi ? 1 : 4, 
                           repeat: Infinity, 
-                          delay: i * 0.8,
+                          delay: i * (isPlayingMidi ? 0.2 : 0.8),
                           ease: "easeOut" 
                         }}
                       />
@@ -299,6 +368,17 @@ export const LiveStage: React.FC<LiveStageProps> = ({ currentTrack, user, profil
                     </span>
                   </div>
                   <p className="text-sm text-zinc-300 leading-relaxed font-light">{msg.text}</p>
+                  {(msg as any).midiData && (
+                    <div className="mt-3 flex gap-2">
+                       <button 
+                         onClick={() => playMidiSequence((msg as any).midiData)}
+                         className="inline-flex items-center gap-2 bg-black/60 rounded-xl pl-2 pr-4 py-1.5 border border-white/10 cursor-pointer hover:border-gold/50 hover:bg-gold/10 transition-all font-bold text-gold/80 hover:text-gold"
+                       >
+                         <Play fill="currentColor" size={10} />
+                         <span className="text-[10px] font-mono tracking-widest uppercase">Play Seq ({((msg as any).midiData).length})</span>
+                       </button>
+                    </div>
+                  )}
                   {(msg as any).frequency && (
                     <div className="mt-3 inline-flex items-center gap-2 bg-black/60 rounded-xl pl-2 pr-4 py-1.5 border border-white/10 cursor-pointer hover:border-gold/50 transition-all group/freq" onClick={() => activeFrequencyId === msg.id ? stopFrequency() : startFrequency((msg as any).frequency!, msg.id)}>
                       <div className={`p-1.5 rounded-lg transition-colors ${activeFrequencyId === msg.id ? 'bg-gold/20 text-gold' : 'bg-white/5 text-zinc-400 group-hover/freq:text-gold'}`}>
@@ -324,8 +404,10 @@ export const LiveStage: React.FC<LiveStageProps> = ({ currentTrack, user, profil
         {/* Input */}
         <div className="relative p-6 bg-black/40 border-t border-white/10 backdrop-blur-xl">
           {auth.currentUser ? (
-            <form onSubmit={handleSendMessage} className="flex flex-col gap-4">
-              <div className="flex flex-wrap gap-2">
+            <div className="flex flex-col gap-4">
+              <LiveRiffCapture onCapture={handleCaptureRiff} />
+              <form onSubmit={handleSendMessage} className="flex flex-col gap-4">
+                <div className="flex flex-wrap gap-2">
                 {[174, 285, 396, 417, 432, 528, 639, 741, 852, 963].map(hz => (
                   <button
                     key={hz}
@@ -358,6 +440,7 @@ export const LiveStage: React.FC<LiveStageProps> = ({ currentTrack, user, profil
                 </button>
               </div>
             </form>
+            </div>
           ) : (
             <div className="text-center py-4 bg-white/5 rounded-2xl border border-white/10">
                 <p className="text-[10px] uppercase tracking-widest text-zinc-400 mb-1">Observation Mode</p>

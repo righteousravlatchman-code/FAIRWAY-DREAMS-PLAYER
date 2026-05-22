@@ -13,7 +13,7 @@ export const ARTISTS = [
     bio: 'Fairway Dreams is an AI-enhanced musical collective, born from the synthesis of ancient frequencies, GG33 numerology, and modern electronic production. Their aim is to elevate consciousness through sound waves.',
     history: 'Founded in 2024, the collective started as a small experiment combining solfeggio frequencies with lo-fi beats, rapidly expanding into a sprawling ecosystem of resonant digital artifacts.',
     influences: ['Dolores Cannon', 'Carl Jung', 'Nostradamus', 'The Monroe Institute', 'Suno AI'],
-    achievements: ['Over 10M Global Streams', 'Pioneers of the AI-Resonance Genre', 'GG33 Authorized Frequency Provider'],
+    achievements: ['Pioneers of the AI-Resonance Genre', 'GG33 Authorized Frequency Provider'],
     discography: [
       {
         id: 'album-1',
@@ -35,32 +35,6 @@ export const ARTISTS = [
         type: 'Single',
         releaseDate: '2024-09-08',
         cover: 'https://images.unsplash.com/photo-1550684848-fac1c5b4e853?auto=format&fit=crop&q=80&w=800'
-      }
-    ]
-  },
-  {
-    id: 'mystic-rebel',
-    name: 'Mystic Rebel',
-    type: 'Producer',
-    cover: 'https://images.unsplash.com/photo-1517404215738-15263e9f9178?auto=format&fit=crop&q=80&w=800',
-    bio: 'An enigmatic producer known for integrating deep astrological insights and mathematical sequences directly into the rhythm structures of their tracks.',
-    history: 'Mystic Rebel emerged from the underground esoteric scene, gaining a cult following by releasing anonymous tracks that seemingly altered the listener\'s mood for the better.',
-    influences: ['John Coltrane', 'Aphex Twin', 'Sacred Geometry', 'Vedic Astrology'],
-    achievements: ['Featured in "Vibrational Sound" Magazine', 'Created the 432Hz Core Curriculum'],
-    discography: [
-      {
-        id: 'album-2',
-        title: 'Star Maps',
-        type: 'Album',
-        releaseDate: '2024-12-01',
-        cover: 'https://images.unsplash.com/photo-1601314167099-232775b3d6fd?auto=format&fit=crop&q=80&w=800'
-      },
-      {
-        id: 'single-2',
-        title: 'Gemini Rising',
-        type: 'Single',
-        releaseDate: '2024-08-14',
-        cover: 'https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&q=80&w=800'
       }
     ]
   }

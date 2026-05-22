@@ -1,11 +1,11 @@
 import React from 'react';
 import { motion } from 'motion/react';
-import { Play, Pause, SkipBack, SkipForward, Volume2, Maximize2, ExternalLink, Heart, Sparkles, Save, Trash2, AlertCircle, Share2, Twitter, Facebook, Instagram, Radio } from 'lucide-react';
+import { Play, Pause, SkipBack, SkipForward, Volume2, Maximize2, ExternalLink, Heart, Sparkles, Save, Trash2, AlertCircle, Share2, Radio, Settings, Sliders, Palette } from 'lucide-react';
 import { AnimatePresence } from 'motion/react';
 import { Track, VisualizerMode, ThemeColors, VisualizerSettings, Playlist } from '../types';
 import { Visualizer } from './Visualizer';
+import { useToast } from './ToastProvider';
 import { ShareButtons } from './ShareButtons';
-import { Settings, Sliders, Palette } from 'lucide-react';
 
 interface PlayerProps {
   currentTrack: Track;
@@ -67,9 +67,67 @@ export const Player: React.FC<PlayerProps> = ({
   playlists
 }) => {
   const [showSettings, setShowSettings] = React.useState(false);
-  const [showShare, setShowShare] = React.useState(false);
+  const [showSharePicker, setShowSharePicker] = React.useState(false);
   const [showPlaylistPicker, setShowPlaylistPicker] = React.useState(false);
   const [isFullscreen, setIsFullscreen] = React.useState(false);
+
+  const imageRef1 = React.useRef<HTMLImageElement>(null);
+  const imageRef2 = React.useRef<HTMLImageElement>(null);
+
+  React.useEffect(() => {
+    if (!analyser || !isPlaying) return;
+    const dataArray = new Uint8Array(analyser.frequencyBinCount);
+    let animationFrameId: number;
+
+    const hexToRgb = (hex: string) => {
+      const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+      return result ? `${parseInt(result[1], 16)},${parseInt(result[2], 16)},${parseInt(result[3], 16)}` : '201,168,76';
+    };
+    const rgbPrimary = theme.primary ? hexToRgb(theme.primary) : '201,168,76';
+
+    const updatePulse = () => {
+      analyser.getByteFrequencyData(dataArray);
+      let sum = 0;
+      for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
+      const avg = sum / dataArray.length;
+      const pulse = avg / 255;
+      
+      // Scale from 1.0 up to 1.15 depending on pulse and intensity
+      const scale = 1 + (pulse * 0.15 * settings.intensity);
+      // We can also add a subtle brightness increase based on pulse
+      const brightness = 1 + (pulse * 0.5);
+      const glowRadius = pulse * 50 * settings.intensity;
+      const glowAlpha = pulse * 0.6;
+
+      if (imageRef1.current) {
+        imageRef1.current.style.transform = `scale(${scale})`;
+        imageRef1.current.style.filter = `brightness(${brightness})`;
+        imageRef1.current.style.boxShadow = `0 0 ${glowRadius}px ${glowRadius/2}px rgba(${rgbPrimary},${glowAlpha})`;
+      }
+      if (imageRef2.current) {
+        imageRef2.current.style.transform = `scale(${scale})`;
+        imageRef2.current.style.filter = `brightness(${brightness})`;
+        imageRef2.current.style.boxShadow = `0 0 ${glowRadius * 1.5}px ${glowRadius}px rgba(${rgbPrimary},${glowAlpha})`;
+      }
+      animationFrameId = requestAnimationFrame(updatePulse);
+    };
+
+    updatePulse();
+
+    return () => {
+      cancelAnimationFrame(animationFrameId);
+      if (imageRef1.current) {
+        imageRef1.current.style.transform = 'scale(1)';
+        imageRef1.current.style.filter = 'brightness(1)';
+        imageRef1.current.style.boxShadow = '';
+      }
+      if (imageRef2.current) {
+        imageRef2.current.style.transform = 'scale(1)';
+        imageRef2.current.style.filter = 'brightness(1)';
+        imageRef2.current.style.boxShadow = '';
+      }
+    };
+  }, [analyser, isPlaying, settings.intensity, theme]);
 
   const formatTime = (s: number) => {
     const mins = Math.floor(s / 60);
@@ -81,37 +139,18 @@ export const Player: React.FC<PlayerProps> = ({
     onSettingsChange({ ...settings, [key]: value });
   };
 
-  const handleShare = (platform: 'twitter' | 'facebook' | 'instagram' | 'copy') => {
-    const shareUrl = window.location.href;
-    const text = `Listening to ${currentTrack.title} by Suno Band! 🎵 #SunoBand #AIComposition`;
-    
-    switch (platform) {
-      case 'twitter':
-        window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(shareUrl)}`, '_blank');
-        break;
-      case 'facebook':
-        window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`, '_blank');
-        break;
-      case 'instagram':
-        // Instagram doesn't have a direct share URL for web, usually just copy link
-        navigator.clipboard.writeText(shareUrl);
-        alert('Link copied for Instagram sharing!');
-        break;
-      case 'copy':
-        navigator.clipboard.writeText(shareUrl);
-        alert('Link copied to clipboard!');
-        break;
-    }
-    setShowShare(false);
-  };
+  const { showToast } = useToast();
+
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="relative rounded-3xl overflow-hidden border border-white/10 shadow-2xl surface-panel"
+        className="relative rounded-[2.5rem] overflow-hidden border border-white/10 shadow-[0_0_50px_-12px_rgba(201,168,76,0.15)] surface-panel bg-black/60 backdrop-blur-3xl"
       >
+        <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent pointer-events-none" />
+        
         {/* Visualizer Area */}
         <div className="relative h-[300px] md:h-[400px] w-full bg-black/20 group">
           <Visualizer 
@@ -228,22 +267,27 @@ export const Player: React.FC<PlayerProps> = ({
               <div className="absolute inset-0 rounded-full border border-white/10 animate-pulse" />
               
               {/* Radial Signal Bars */}
-              <div className="absolute inset-0 flex items-center justify-center">
+              <motion.div 
+                animate={{ rotate: isPlaying ? [0, 360] : 0 }}
+                transition={{ duration: 40, repeat: Infinity, ease: "linear" }}
+                className="absolute inset-0 flex items-center justify-center"
+              >
                 {Array.from({ length: 12 }).map((_, i) => (
                   <motion.div
                     key={i}
                     style={{ rotate: i * 30 }}
                     animate={{ height: isPlaying ? [100, 120, 100] : 90 }}
                     transition={{ duration: 1, repeat: Infinity, delay: i * 0.1 }}
-                    className="absolute w-0.5 bg-gold/20 origin-center md:h-[140px]"
+                    className="absolute w-0.5 bg-gold/30 origin-center md:h-[150px]"
                   />
                 ))}
-              </div>
+              </motion.div>
 
               <img 
+                ref={imageRef1}
                 src={currentTrack.art || '/src/assets/images/default_cover_1779345608057.png'} 
                 alt={currentTrack.title}
-                className="w-28 h-28 md:w-40 md:h-40 rounded-full border-2 border-gold object-cover shadow-2xl relative z-10"
+                className="w-28 h-28 md:w-40 md:h-40 rounded-full border-2 border-gold object-cover shadow-[0_0_30px_rgba(201,168,76,0.3)] relative z-10 transition-transform duration-75"
                 referrerPolicy="no-referrer"
               />
             </motion.div>
@@ -315,12 +359,32 @@ export const Player: React.FC<PlayerProps> = ({
           </div>
 
           <div className="absolute top-6 right-6 flex gap-2">
-            <div className="bg-black/50 backdrop-blur-md rounded-lg p-1 border border-white/10 flex items-center pr-2">
-              <ShareButtons 
-                url={window.location.origin + `/?track=${currentTrack.id}`}
-                title={currentTrack.title}
-                type="track"
-              />
+            <div className="relative">
+              <button 
+                onClick={() => setShowSharePicker(!showSharePicker)}
+                className={`p-2 rounded-lg backdrop-blur-md border border-white/10 transition-colors flex items-center gap-2 ${showSharePicker ? 'bg-gold text-black border-gold' : 'bg-black/50 text-gold hover:bg-gold hover:text-black'}`}
+                title="Share Track"
+              >
+                <Share2 size={16} />
+                <span className="text-[10px] uppercase tracking-wider hidden md:inline">Share</span>
+              </button>
+
+              <AnimatePresence>
+                {showSharePicker && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.9, y: 10 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.9, y: 10 }}
+                    className="absolute top-full right-0 mt-2 bg-black/90 backdrop-blur-xl border border-white/10 rounded-xl p-3 z-50 shadow-2xl"
+                  >
+                    <ShareButtons 
+                      url={window.location.origin + `/?track=${currentTrack.id}`}
+                      title={currentTrack.title}
+                      type="track"
+                    />
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
 
             <button 
@@ -336,7 +400,7 @@ export const Player: React.FC<PlayerProps> = ({
                 <button 
                   onClick={() => setShowPlaylistPicker(!showPlaylistPicker)}
                   className={`p-2 rounded-lg bg-black/50 backdrop-blur-md border border-white/10 transition-colors ${showPlaylistPicker ? 'bg-gold text-black border-gold' : 'text-gold hover:bg-gold hover:text-black'}`}
-                  title="Add to Vault"
+                  title="Add to Playlist"
                 >
                   <Save size={16} />
                 </button>
@@ -349,7 +413,7 @@ export const Player: React.FC<PlayerProps> = ({
                       exit={{ opacity: 0, scale: 0.9, y: 10 }}
                       className="absolute top-full right-0 mt-2 w-56 bg-black/90 backdrop-blur-xl border border-white/10 rounded-xl p-3 z-50 shadow-2xl"
                     >
-                      <h5 className="text-[8px] uppercase tracking-widest text-zinc-500 mb-3 border-b border-white/5 pb-2">Save to Curation Vault</h5>
+                      <h5 className="text-[8px] uppercase tracking-widest text-zinc-500 mb-3 border-b border-white/5 pb-2">Save to Curation Playlist</h5>
                       <div className="flex flex-col gap-1 max-h-48 overflow-y-auto pr-1 custom-scrollbar">
                         {playlists.length > 0 ? (
                           playlists.map(playlist => {
@@ -369,7 +433,7 @@ export const Player: React.FC<PlayerProps> = ({
                             );
                           })
                         ) : (
-                          <p className="text-[8px] text-zinc-600 text-center py-4">No vaults found. Create one in your Profile.</p>
+                          <p className="text-[8px] text-zinc-600 text-center py-4">No playlists found. Create one in your Profile.</p>
                         )}
                       </div>
                     </motion.div>
@@ -432,7 +496,7 @@ export const Player: React.FC<PlayerProps> = ({
               <div className="flex flex-col md:flex-row md:items-center gap-3">
                 <span className="text-[10px] uppercase tracking-widest text-[var(--text-secondary)] hidden md:inline">Visualizer</span>
                 <div className="flex flex-wrap items-center justify-center gap-1.5 md:gap-1">
-                  {(['bars', 'wave', 'radial', 'particles', 'mirror', 'scope', 'tunnel', 'nebula', 'vortex', 'matrix', 'kaleidoscope'] as VisualizerMode[]).map((m) => (
+                  {(['bars', 'wave', 'radial', 'particles', 'mirror', 'scope', 'tunnel', 'nebula', 'vortex', 'matrix', 'kaleidoscope', 'liquid', 'dna', 'galaxy', 'atom', 'blackhole', 'constellation'] as VisualizerMode[]).map((m) => (
                     <button
                       key={m}
                       onClick={() => updateSetting('mode', m)}
@@ -731,20 +795,30 @@ export const Player: React.FC<PlayerProps> = ({
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
               <motion.div 
                 animate={{ 
-                  scale: isPlaying ? [1, 1.05, 1] : 1,
-                  rotate: isPlaying ? [0, 360] : 0
+                  scale: isPlaying ? [1, 1.05, 1] : 1
                 }}
                 transition={{ 
-                  scale: { duration: 4, repeat: Infinity, ease: "easeInOut" },
-                  rotate: { duration: 60, repeat: Infinity, ease: "linear" }
+                  scale: { duration: 4, repeat: Infinity, ease: "easeInOut" }
                 }}
-                className="relative p-12"
+                className="relative p-12 flex items-center justify-center"
               >
-                 <div className="absolute inset-0 rounded-full border border-gold/10 animate-pulse" />
+                 <motion.div 
+                   animate={{ rotate: isPlaying ? [0, 360] : 0 }}
+                   transition={{ duration: 60, repeat: Infinity, ease: "linear" }}
+                   className="absolute inset-0 rounded-full border border-gold/20 border-dashed animate-pulse opacity-50"
+                 />
+                 
+                 <motion.div 
+                   animate={{ rotate: isPlaying ? [360, 0] : 0 }}
+                   transition={{ duration: 45, repeat: Infinity, ease: "linear" }}
+                   className="absolute inset-4 rounded-full border border-gold/10 border-dotted"
+                 />
+
                  <img 
+                  ref={imageRef2}
                   src={currentTrack.art || '/src/assets/images/default_cover_1779345608057.png'} 
                   alt={currentTrack.title}
-                  className="w-48 h-48 md:w-72 md:h-72 rounded-full border-4 border-gold/50 object-cover shadow-[0_0_50px_rgba(201,168,76,0.3)] relative z-10"
+                  className="w-48 h-48 md:w-72 md:h-72 rounded-full border-4 border-gold/50 object-cover shadow-[0_0_50px_rgba(201,168,76,0.5)] relative z-10 transition-transform duration-75"
                 />
               </motion.div>
             </div>
