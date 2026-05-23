@@ -82,7 +82,7 @@ export const Visualizer: React.FC<VisualizerProps> = ({ analyser, settings, them
 
   const handleDoubleClick = () => {
     if (!onSettingsChange) return;
-    const modes: VisualizerMode[] = ['bars', 'wave', 'radial', 'particles', 'mirror', 'scope', 'tunnel', 'nebula', 'vortex', 'matrix', 'kaleidoscope', 'liquid', 'dna', 'galaxy', 'atom', 'blackhole', 'constellation'];
+    const modes: VisualizerMode[] = ['bars', 'wave', 'radial', 'particles', 'mirror', 'scope', 'tunnel', 'nebula', 'vortex', 'matrix', 'kaleidoscope', 'liquid', 'dna', 'galaxy', 'atom', 'blackhole', 'constellation', 'cymatics', 'sacred-geometry', 'hologram'];
     const currentIndex = modes.indexOf(settings.mode);
     const nextIndex = (currentIndex + 1) % modes.length;
     
@@ -180,9 +180,10 @@ export const Visualizer: React.FC<VisualizerProps> = ({ analyser, settings, them
     }
 
     // Ambient Glow
-    const radGlow = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, W * 0.6);
+    const radGlow = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, W * 0.8);
     const primaryColor = settings.customColor || theme.primary;
-    radGlow.addColorStop(0, `${primaryColor}${Math.max(0, Math.min(255, Math.floor(pulse * 40 * intensity))).toString(16).padStart(2, '0')}`);
+    radGlow.addColorStop(0, `${primaryColor}${Math.max(0, Math.min(255, Math.floor(pulse * 60 * intensity))).toString(16).padStart(2, '0')}`);
+    radGlow.addColorStop(0.5, `${primaryColor}${Math.max(0, Math.min(255, Math.floor(pulse * 15 * intensity))).toString(16).padStart(2, '0')}`);
     radGlow.addColorStop(1, 'transparent');
     ctx.globalCompositeOperation = 'lighter';
     ctx.fillStyle = radGlow;
@@ -221,12 +222,15 @@ export const Visualizer: React.FC<VisualizerProps> = ({ analyser, settings, them
     else if (mode === 'atom') drawAtom(ctx, dataArray, timeData, W, H, theme, pulse, settings);
     else if (mode === 'blackhole') drawBlackHole(ctx, dataArray, timeData, W, H, theme, pulse, settings);
     else if (mode === 'constellation') drawConstellation(ctx, dataArray, W, H, theme, pulse, settings);
+    else if (mode === 'cymatics') drawCymatics(ctx, dataArray, timeData, W, H, theme, pulse, settings);
+    else if (mode === 'sacred-geometry') drawSacredGeometry(ctx, dataArray, timeData, W, H, theme, pulse, settings);
+    else if (mode === 'hologram') drawHologram(ctx, dataArray, timeData, W, H, theme, pulse, settings);
 
     // Dynamic High-Energy Flash Effect
     if (chromaticRef.current > 5) {
       ctx.save();
       ctx.globalCompositeOperation = 'screen';
-      ctx.fillStyle = `${theme.accent}${Math.min(255, Math.floor(chromaticRef.current * 4)).toString(16).padStart(2, '0')}`;
+      ctx.fillStyle = `${theme.accent}${Math.min(255, Math.floor(chromaticRef.current * 6)).toString(16).padStart(2, '0')}`;
       ctx.fillRect(0, 0, W, H);
       ctx.restore();
     }
@@ -234,18 +238,18 @@ export const Visualizer: React.FC<VisualizerProps> = ({ analyser, settings, them
     // Chromatic Aberration Effect
     if (chromaticRef.current > 0.5) {
       ctx.save();
-      ctx.globalCompositeOperation = 'screen';
-      ctx.globalAlpha = 0.5;
-      ctx.drawImage(canvas, chromaticRef.current, 0);
+      ctx.globalCompositeOperation = 'lighten';
+      ctx.globalAlpha = 0.6;
+      ctx.drawImage(canvas, chromaticRef.current * 1.5, 0);
       ctx.globalCompositeOperation = 'multiply';
-      ctx.drawImage(canvas, -chromaticRef.current, 0);
+      ctx.drawImage(canvas, -chromaticRef.current * 1.5, 0);
       ctx.restore();
     }
 
     // Add cinematic vignette
-    const vignetteGrad = ctx.createRadialGradient(W/2, H/2, W/4, W/2, H/2, W/1.2);
+    const vignetteGrad = ctx.createRadialGradient(W/2, H/2, W/4, W/2, H/2, W/1.1);
     vignetteGrad.addColorStop(0, 'rgba(0,0,0,0)');
-    vignetteGrad.addColorStop(1, 'rgba(0,0,0,0.6)');
+    vignetteGrad.addColorStop(1, 'rgba(0,0,0,0.85)');
     ctx.globalCompositeOperation = 'multiply';
     ctx.fillStyle = vignetteGrad;
     ctx.fillRect(0, 0, W, H);
@@ -1836,6 +1840,178 @@ export const Visualizer: React.FC<VisualizerProps> = ({ analyser, settings, them
         }
     }
     
+    ctx.restore();
+  };
+
+  const drawCymatics = (ctx: CanvasRenderingContext2D, d: Uint8Array, timeData: Uint8Array, W: number, H: number, theme: ThemeColors, pulse: number, s: VisualizerSettings) => {
+    const primaryColor = s.customColor || theme.primary;
+    const cx = W / 2;
+    const cy = H / 2;
+    const time = Date.now() * 0.001 * s.speed;
+    const minDim = Math.min(W, H);
+
+    ctx.save();
+    ctx.translate(cx, cy);
+
+    // Chladni plate pattern parameters (influenced by audio)
+    const m = 3 + Math.floor((d[10] / 255) * 5 * s.intensity);
+    const n = 2 + Math.floor((d[20] / 255) * 6 * s.intensity);
+    const a = 1;
+    const b = 1;
+
+    ctx.fillStyle = `${primaryColor}10`;
+    ctx.beginPath();
+    ctx.arc(0, 0, minDim * 0.45, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#ffffff';
+    ctx.globalCompositeOperation = 'screen';
+    
+    // Calculate and draw particles resting on nodes of Chladni function
+    // cos(n pi x / L) cos(m pi y / L) - cos(m pi x / L) cos(n pi y / L) = 0
+    const points = 1000;
+    const L = minDim * 0.4;
+    for (let i = 0; i < points; i++) {
+       // Pseudo-random distribution seeded by time to create "dancing" sand
+       const px = (Math.sin(i * 123.456 + time * 0.5) * L);
+       const py = (Math.cos(i * 789.123 + time * 0.6) * L);
+       
+       const nf = px / L * Math.PI;
+       const mf = py / L * Math.PI;
+       
+       const chladniValue = Math.cos(n * nf) * Math.cos(m * mf) - Math.cos(m * nf) * Math.cos(n * mf);
+       
+       // Only draw points near zero (the nodes where sand collects)
+       if (Math.abs(chladniValue) < 0.2 + (pulse * 0.1)) {
+          const jitter = (d[i % d.length] / 255) * 10 * s.intensity;
+          ctx.beginPath();
+          ctx.arc(px + (Math.random() - 0.5) * jitter, py + (Math.random() - 0.5) * jitter, 1.5, 0, Math.PI * 2);
+          ctx.fill();
+       }
+    }
+
+    // Concentric resonant rippling energy
+    ctx.strokeStyle = theme.accent;
+    for (let i = 0; i < 4; i++) {
+        const rad = (time * 50 + i * 50) % (minDim * 0.5);
+        ctx.beginPath();
+        ctx.arc(0, 0, rad, 0, Math.PI * 2);
+        ctx.lineWidth = Math.max(0.1, 2 - (rad / (minDim * 0.4)));
+        ctx.stroke();
+    }
+
+    ctx.restore();
+  };
+
+  const drawSacredGeometry = (ctx: CanvasRenderingContext2D, d: Uint8Array, timeData: Uint8Array, W: number, H: number, theme: ThemeColors, pulse: number, s: VisualizerSettings) => {
+    const primaryColor = s.customColor || theme.primary;
+    const cx = W / 2;
+    const cy = H / 2;
+    const minDim = Math.min(W, H);
+    const R = minDim * 0.25 + pulse * 40 * s.intensity;
+    const time = Date.now() * 0.0005 * s.speed;
+
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(time * 0.5);
+
+    ctx.strokeStyle = primaryColor;
+    ctx.lineWidth = 1 + pulse * 2;
+    ctx.shadowBlur = 15;
+    ctx.shadowColor = theme.accent;
+
+    // Seed of Life pattern
+    ctx.beginPath();
+    ctx.arc(0, 0, R, 0, Math.PI * 2);
+    ctx.stroke();
+
+    for (let i = 0; i < 6; i++) {
+        const angle = i * Math.PI / 3 + time * 0.2;
+        const x = Math.cos(angle) * R;
+        const y = Math.sin(angle) * R;
+        ctx.beginPath();
+        ctx.arc(x, y, R, 0, Math.PI * 2);
+        
+        // Intensity-based inner glow
+        const val = d[i * 10 % d.length] / 255;
+        if (val > 0.6) {
+           ctx.fillStyle = `${theme.accent}${Math.floor(val * 40).toString(16).padStart(2, '0')}`;
+           ctx.fill();
+        }
+        ctx.stroke();
+        
+        // Metatron's cube connection lines
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(x, y);
+        ctx.strokeStyle = `${theme.secondary}80`;
+        ctx.lineWidth = 0.5 + val;
+        ctx.stroke();
+    }
+
+    // Outer framing polygon (hexagon changing to dodecagon based on bass)
+    ctx.rotate(-time);
+    ctx.beginPath();
+    const sides = pulse > 0.5 ? 12 : 6;
+    for (let i = 0; i <= sides; i++) {
+        const angle = i * Math.PI * 2 / sides;
+        const x = Math.cos(angle) * R * 2.1;
+        const y = Math.sin(angle) * R * 2.1;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+    }
+    ctx.strokeStyle = primaryColor;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.restore();
+  };
+
+  const drawHologram = (ctx: CanvasRenderingContext2D, d: Uint8Array, timeData: Uint8Array, W: number, H: number, theme: ThemeColors, pulse: number, s: VisualizerSettings) => {
+    const cx = W / 2;
+    const cy = H / 2;
+    const time = Date.now() * 0.002 * s.speed;
+
+    ctx.save();
+    
+    // Scanlines and jitter effect for the hologram
+    ctx.globalCompositeOperation = 'screen';
+    
+    // Translate and jitter logic based on pulse
+    const jitterX = (Math.random() - 0.5) * pulse * 10 * s.intensity;
+    ctx.translate(jitterX, 0);
+
+    const steps = 60;
+    const spacing = 4;
+    const radiusY = 80;
+    
+    for (let j = 0; j < 3; j++) {
+        // Red, Green, Blue chromatic splitting
+        ctx.strokeStyle = j === 0 ? '#ff000088' : (j === 1 ? '#00ff0088' : '#0000ff88');
+        ctx.lineWidth = 1;
+        
+        const splitOffset = (j - 1) * 3 * s.intensity;
+        
+        ctx.beginPath();
+        for (let i = 0; i < steps; i++) {
+            const freqVal = (d[Math.floor((i/steps) * d.length)] / 255) * 80 * s.sensitivity;
+            const yOffset = -i * spacing;
+            const radiusX = 100 + i * 2 + freqVal + pulse * 20;
+
+            const wobble = Math.sin(time + i * 0.1) * 20;
+
+            const rx = cx + wobble + splitOffset;
+            const ry = cy + yOffset + 50;
+
+            ctx.ellipse(rx, ry, radiusX, radiusY * (0.2 + (i/steps) * 0.3), 0, Math.PI, 0, true);
+        }
+        ctx.stroke();
+    }
+    
+    // Interference banding (horizontal hologram bands going up)
+    const bandY = H - (Date.now() * 0.1) % (H * 1.5);
+    ctx.fillStyle = 'rgba(255,255,255,0.05)';
+    ctx.fillRect(0, bandY, W, 80);
+
     ctx.restore();
   };
 

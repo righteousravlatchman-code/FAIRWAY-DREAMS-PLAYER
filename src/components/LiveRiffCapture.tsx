@@ -1,9 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Mic, Square, Activity, Save, Download, Settings, Timer } from 'lucide-react';
+import { Mic, Square, Activity, Save, Download, Settings, Timer, Play } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useToast } from './ToastProvider';
 
-export const LiveRiffCapture: React.FC<{ onCapture: (midiData: number[], annotation?: string) => void }> = ({ onCapture }) => {
+export const LiveRiffCapture: React.FC<{ 
+  onCapture: (midiData: number[], annotation?: string) => void,
+  onSaveLibrary?: (midiData: number[], annotation?: string) => void
+}> = ({ onCapture, onSaveLibrary }) => {
   const [isRecording, setIsRecording] = useState(false);
   const [midiSequence, setMidiSequence] = useState<number[]>([]);
   const [currentNote, setCurrentNote] = useState<number | null>(null);
@@ -13,6 +16,9 @@ export const LiveRiffCapture: React.FC<{ onCapture: (midiData: number[], annotat
   const [annotation, setAnnotation] = useState('');
   const [metronomeEnabled, setMetronomeEnabled] = useState(false);
   const [metronomeBpm, setMetronomeBpm] = useState(120);
+  const [synthVoice, setSynthVoice] = useState<OscillatorType>('sine');
+  const [isPlaying, setIsPlaying] = useState(false);
+  const synthVoiceRef = useRef<OscillatorType>('sine');
   
   const [quantize, setQuantize] = useState(false);
   const [timeQuantize, setTimeQuantize] = useState(false);
@@ -69,7 +75,7 @@ export const LiveRiffCapture: React.FC<{ onCapture: (midiData: number[], annotat
       setCalibrating(true);
       setMeasuredLatency(null);
       isCalibratingRef.current = true;
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, echoCancellation: false });
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false } });
       
       const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
       const source = audioCtx.createMediaStreamSource(stream);
@@ -275,6 +281,39 @@ export const LiveRiffCapture: React.FC<{ onCapture: (midiData: number[], annotat
     setCurrentNote(null);
   };
 
+  const playCapturedRiff = () => {
+    if (midiSequence.length === 0 || isPlaying) return;
+    setIsPlaying(true);
+    const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    
+    let time = audioCtx.currentTime + 0.1;
+    const stepDuration = 60.0 / metronomeBpmRef.current / 2; // Assuming 8th notes based on processAudio grid logic
+
+    midiSequence.forEach((note) => {
+      if (note > 0) {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.type = synthVoiceRef.current;
+        osc.frequency.value = 440 * Math.pow(2, (note - 69) / 12);
+        
+        gain.gain.value = 0;
+        gain.gain.setValueAtTime(0.5, time);
+        gain.gain.exponentialRampToValueAtTime(0.001, time + stepDuration - 0.01);
+        
+        osc.start(time);
+        osc.stop(time + stepDuration);
+      }
+      time += stepDuration;
+    });
+
+    setTimeout(() => {
+        setIsPlaying(false);
+        audioCtx.close();
+    }, (time - audioCtx.currentTime) * 1000 + 100);
+  };
+
   useEffect(() => {
     return () => stopRecording();
   }, []);
@@ -284,6 +323,13 @@ export const LiveRiffCapture: React.FC<{ onCapture: (midiData: number[], annotat
       onCapture(midiSequence, annotation);
       setMidiSequence([]);
       setAnnotation('');
+    }
+  };
+
+  const handleSaveLibrary = () => {
+    if (midiSequence.length > 0 && onSaveLibrary) {
+      onSaveLibrary(midiSequence, annotation);
+      // Optional: Clear sequence or just show it saved
     }
   };
 
@@ -544,6 +590,26 @@ export const LiveRiffCapture: React.FC<{ onCapture: (midiData: number[], annotat
                 </div>
               )}
             </div>
+
+            <div className="flex flex-col gap-2 pt-2 border-t border-white/10 mt-1">
+              <div className="flex justify-between items-center text-[10px] uppercase tracking-wider text-zinc-400">
+                <span>Synth Voice</span>
+                <select 
+                   value={synthVoice}
+                   onChange={(e) => {
+                     const val = e.target.value as OscillatorType;
+                     setSynthVoice(val);
+                     synthVoiceRef.current = val;
+                   }}
+                   className="bg-black/40 text-white border border-white/10 rounded p-1 outline-none text-xs"
+                >
+                   <option value="sine">Sine</option>
+                   <option value="square">Square</option>
+                   <option value="sawtooth">Sawtooth</option>
+                   <option value="triangle">Triangle</option>
+                </select>
+              </div>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -570,18 +636,33 @@ export const LiveRiffCapture: React.FC<{ onCapture: (midiData: number[], annotat
                   className="w-full bg-black/40 border border-white/10 rounded-lg p-2 text-xs text-white placeholder:text-zinc-600 focus:outline-none focus:border-gold/50"
                   maxLength={100}
                 />
-                <div className="flex gap-2">
+                <div className="flex flex-col sm:flex-row gap-2 mt-2">
+                  <button 
+                    onClick={playCapturedRiff}
+                    disabled={isPlaying}
+                    className="flex-1 flex items-center gap-2 justify-center py-2 bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 rounded-lg transition-colors text-[10px] font-bold uppercase tracking-widest border border-purple-500/20 disabled:opacity-50"
+                  >
+                    <Play size={12} /> Play
+                  </button>
                   <button 
                     onClick={handleSave}
                     className="flex-1 flex items-center gap-2 justify-center py-2 bg-gold/10 hover:bg-gold/20 text-gold rounded-lg transition-colors text-[10px] font-bold uppercase tracking-widest border border-gold/20"
                   >
-                    <Save size={12} /> Share Riff
+                    <Save size={12} /> Share
                   </button>
+                  {onSaveLibrary && (
+                    <button 
+                      onClick={handleSaveLibrary}
+                      className="flex-1 flex items-center gap-2 justify-center py-2 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 rounded-lg transition-colors text-[10px] font-bold uppercase tracking-widest border border-blue-500/20"
+                    >
+                      Library
+                    </button>
+                  )}
                   <button 
                     onClick={exportMidi}
                     className="flex-1 flex items-center gap-2 justify-center py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg transition-colors text-[10px] font-bold uppercase tracking-widest border border-white/10"
                   >
-                    <Download size={12} /> Export .MID
+                    <Download size={12} /> MID
                   </button>
                 </div>
               </div>

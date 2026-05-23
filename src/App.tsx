@@ -31,6 +31,8 @@ import { LiveStage } from './components/LiveStage';
 import { ToolGuide } from './components/ToolGuide';
 import { MilitaryDroneBackground } from './components/MilitaryDroneBackground';
 import { ArtistsView } from './components/ArtistsView';
+import { RiffLibrary } from './components/RiffLibrary';
+import { useRiffLibrary } from './hooks/useRiffLibrary';
 import { getHebrewName } from './services/geminiService';
 import { GoogleGenAI } from "@google/genai";
 import { UserProfile, SavedInsight, Playlist, ListeningEvent, Product, CartItem } from './types';
@@ -95,13 +97,33 @@ export default function App() {
     themeName: 'gold',
     speed: 1,
     sensitivity: 1,
-    intensity: 1
+    intensity: 1,
+    showCenterImage: true
   });
   const [activeTheme, setActiveTheme] = useState<ThemeColors>(THEMES.gold);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [insight, setInsight] = useState<string | null>(null);
   const [isGeneratingInsight, setIsGeneratingInsight] = useState(false);
-  const [userData, setUserData] = useState<{ name: string; birthDate: string } | null>(null);
+  const [userData, setUserData] = useState<{ name: string; birthDate: string } | null>(() => {
+    const saved = localStorage.getItem('fd_userData');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        return null;
+      }
+    }
+    return null;
+  });
+
+  const saveUserData = (data: { name: string; birthDate: string } | null) => {
+    setUserData(data);
+    if (data) {
+      localStorage.setItem('fd_userData', JSON.stringify(data));
+    } else {
+      localStorage.removeItem('fd_userData');
+    }
+  };
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile>(INITIAL_PROFILE);
   const [isAuthReady, setIsAuthReady] = useState(false);
@@ -109,6 +131,8 @@ export default function App() {
   const [tracks, setTracks] = useState<Track[]>(TRACKS);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [listeningHistory, setListeningHistory] = useState<ListeningEvent[]>([]);
+
+  const { riffs, saveRiff, deleteRiff } = useRiffLibrary();
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const { showToast } = useToast();
@@ -284,7 +308,7 @@ Plant conceptual seeds now for action in his next personal year. Present thought
 
         // If userData isn't set but we have it in profile, sync it
         if (!userData && data.name && data.birthDate) {
-          setUserData({ name: data.name, birthDate: data.birthDate });
+          saveUserData({ name: data.name, birthDate: data.birthDate });
         }
       } else {
         // Initialize new user profile
@@ -655,7 +679,7 @@ Plant conceptual seeds now for action in his next personal year. Present thought
   };
 
   const handleIntakeComplete = (data: { name: string; birthDate: string }) => {
-    setUserData(data);
+    saveUserData(data);
     if (user) {
       updateProfile({ name: data.name, ...data } as any);
     }
@@ -1144,7 +1168,8 @@ Plant conceptual seeds now for action in his next personal year. Present thought
               <LiveStage 
                 currentTrack={currentTrack} 
                 user={user} 
-                profile={profile} 
+                profile={profile}
+                onSaveRiff={(midi, note) => saveRiff({ name: note || 'Live Riff', category: 'Live', midiData: midi, annotation: note })}
               />
             </motion.div>
           )}
@@ -1412,6 +1437,7 @@ Plant conceptual seeds now for action in his next personal year. Present thought
                     { id: 'gematria', name: 'Gematria' },
                     { id: 'jeopardy', name: 'Jeopardy' },
                     { id: 'tuner', name: 'Freq Tuner' },
+                    { id: 'riff-library', name: 'Riff Library' },
                     { id: 'journal', name: 'Intention Coder' },
                     { id: 'external', name: 'Quantum App' }
                   ].map(tool => (
@@ -1444,41 +1470,53 @@ Plant conceptual seeds now for action in his next personal year. Present thought
                   )}
                   {activeTool === 'astrology' && (
                     <motion.div key="astrology" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}>
-                      <AstrologyTool userData={userData!} onReset={() => setUserData(null)} />
+                      <AstrologyTool userData={userData!} onReset={() => saveUserData(null)} />
                     </motion.div>
                   )}
                   {activeTool === 'numerology' && (
                     <motion.div key="numerology" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}>
                       <NumerologyTool 
                         userData={userData!} 
-                        onReset={() => setUserData(null)} 
+                        onReset={() => saveUserData(null)} 
                         tracks={tracks}
                       />
                     </motion.div>
                   )}
                   {activeTool === 'chinese' && (
                     <motion.div key="chinese" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}>
-                      <ChineseAstrologyTool userData={userData!} onReset={() => setUserData(null)} />
+                      <ChineseAstrologyTool userData={userData!} onReset={() => saveUserData(null)} />
                     </motion.div>
                   )}
                   {activeTool === 'letterology' && (
                     <motion.div key="letterology" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}>
-                      <LetterologyTool userData={userData!} onReset={() => setUserData(null)} />
+                      <LetterologyTool userData={userData!} onReset={() => saveUserData(null)} />
                     </motion.div>
                   )}
                   {activeTool === 'gematria' && (
                     <motion.div key="gematria" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}>
-                      <GematriaTool userData={userData!} onReset={() => setUserData(null)} />
+                      <GematriaTool userData={userData!} onReset={() => saveUserData(null)} />
                     </motion.div>
                   )}
                   {activeTool === 'jeopardy' && (
                     <motion.div key="jeopardy" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}>
-                      <JeopardyTool userData={userData!} onReset={() => setUserData(null)} />
+                      <JeopardyTool userData={userData!} onReset={() => saveUserData(null)} />
                     </motion.div>
                   )}
                   {activeTool === 'tuner' && (
                     <motion.div key="tuner" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}>
                       <FrequencyTuner />
+                    </motion.div>
+                  )}
+                  {activeTool === 'riff-library' && (
+                    <motion.div key="riff-library" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}>
+                      <RiffLibrary 
+                        riffs={riffs}
+                        onSaveRiff={saveRiff}
+                        onDeleteRiff={deleteRiff}
+                        onShareRiff={(midi, annotation) => {
+                          showToast("Go to Live Stage tab to share riffs!");
+                        }}
+                      />
                     </motion.div>
                   )}
                   {activeTool === 'journal' && (

@@ -9,9 +9,10 @@ interface LiveStageProps {
   currentTrack: Track;
   user: any;
   profile: UserProfile;
+  onSaveRiff?: (midiData: number[], annotation?: string) => void;
 }
 
-export const LiveStage: React.FC<LiveStageProps> = ({ currentTrack, user, profile }) => {
+export const LiveStage: React.FC<LiveStageProps> = ({ currentTrack, user, profile, onSaveRiff }) => {
   const [messages, setMessages] = useState<LiveMessage[]>([]);
   const [messageText, setMessageText] = useState('');
   const [viewersCount, setViewersCount] = useState(0);
@@ -405,7 +406,7 @@ export const LiveStage: React.FC<LiveStageProps> = ({ currentTrack, user, profil
         <div className="relative p-6 bg-black/40 border-t border-white/10 backdrop-blur-xl">
           {auth.currentUser ? (
             <div className="flex flex-col gap-4">
-              <LiveRiffCapture onCapture={handleCaptureRiff} />
+              <LiveRiffCapture onCapture={handleCaptureRiff} onSaveLibrary={onSaveRiff} />
               <form onSubmit={handleSendMessage} className="flex flex-col gap-4">
                 <div className="flex flex-wrap gap-2">
                 {[174, 285, 396, 417, 432, 528, 639, 741, 852, 963].map(hz => (

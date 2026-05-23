@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'motion/react';
-import { Play, Pause, SkipBack, SkipForward, Volume2, Maximize2, ExternalLink, Heart, Sparkles, Save, Trash2, AlertCircle, Share2, Radio, Settings, Sliders, Palette } from 'lucide-react';
+import { Play, Pause, SkipBack, SkipForward, Volume2, Maximize2, ExternalLink, Heart, Sparkles, Save, Trash2, AlertCircle, Share2, Radio, Settings, Sliders, Palette, ChevronDown, Image as ImageIcon } from 'lucide-react';
 import { AnimatePresence } from 'motion/react';
 import { Track, VisualizerMode, ThemeColors, VisualizerSettings, Playlist } from '../types';
 import { Visualizer } from './Visualizer';
@@ -160,6 +160,38 @@ export const Player: React.FC<PlayerProps> = ({
             isPlaying={isPlaying} 
             onSettingsChange={onSettingsChange}
           />
+
+          {/* Optional Center Image */}
+          <AnimatePresence>
+            {settings.showCenterImage && (
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.8 }}
+                className="absolute inset-0 flex items-center justify-center pointer-events-none mix-blend-screen"
+              >
+                <motion.div
+                  animate={{ 
+                    scale: isPlaying ? [1, 1.05, 1] : 1,
+                    rotate: isPlaying ? [0, 360] : 0
+                  }}
+                  transition={{ 
+                    scale: { duration: 2, repeat: Infinity, ease: "easeInOut" },
+                    rotate: { duration: 40, repeat: Infinity, ease: "linear" }
+                  }}
+                  className="relative w-32 h-32 md:w-48 md:h-48"
+                >
+                  <div className="absolute inset-0 rounded-full border border-gold/30 border-dashed animate-pulse" />
+                  <img 
+                    src={currentTrack.art || '/src/assets/images/default_cover_1779345608057.png'} 
+                    alt={currentTrack.title}
+                    className="w-full h-full rounded-full object-cover opacity-70 border border-white/10"
+                    referrerPolicy="no-referrer"
+                  />
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
           
           {/* Visualizer Interaction Hint */}
           <div className="absolute bottom-4 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none w-[90%] max-w-sm">
@@ -248,84 +280,66 @@ export const Player: React.FC<PlayerProps> = ({
                       </button>
                     </div>
                   </div>
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center text-[8px] uppercase tracking-widest text-[var(--text-secondary)]">
+                      <span className="flex items-center gap-2"><ImageIcon size={10} /> Center Image</span>
+                      <button 
+                        onClick={() => updateSetting('showCenterImage', !settings.showCenterImage)}
+                        className={`w-8 h-4 rounded-full relative transition-colors ${settings.showCenterImage ? 'bg-gold' : 'bg-white/10'}`}
+                      >
+                         <div className={`absolute top-0.5 left-0.5 w-3 h-3 rounded-full bg-white transition-transform ${settings.showCenterImage ? 'translate-x-4' : 'translate-x-0'}`} />
+                      </button>
+                    </div>
+                  </div>
+
                 </div>
               </motion.div>
             )}
           </AnimatePresence>
           
-          {/* Overlay Info */}
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <motion.div 
-              animate={{ 
-                scale: isPlaying ? [1, 1.08, 1] : 1,
-              }}
-              transition={{ 
-                scale: { duration: 2, repeat: Infinity, ease: "easeInOut" },
-              }}
-              className="relative p-8"
-            >
-              <div className="absolute inset-0 rounded-full border border-white/10 animate-pulse" />
-              
-              {/* Radial Signal Bars */}
-              <motion.div 
-                animate={{ rotate: isPlaying ? [0, 360] : 0 }}
-                transition={{ duration: 40, repeat: Infinity, ease: "linear" }}
-                className="absolute inset-0 flex items-center justify-center"
-              >
-                {Array.from({ length: 12 }).map((_, i) => (
-                  <motion.div
-                    key={i}
-                    style={{ rotate: i * 30 }}
-                    animate={{ height: isPlaying ? [100, 120, 100] : 90 }}
-                    transition={{ duration: 1, repeat: Infinity, delay: i * 0.1 }}
-                    className="absolute w-0.5 bg-gold/30 origin-center md:h-[150px]"
-                  />
-                ))}
-              </motion.div>
-
-              <img 
-                ref={imageRef1}
-                src={currentTrack.art || '/src/assets/images/default_cover_1779345608057.png'} 
-                alt={currentTrack.title}
-                className="w-28 h-28 md:w-40 md:h-40 rounded-full border-2 border-gold object-cover shadow-[0_0_30px_rgba(201,168,76,0.3)] relative z-10 transition-transform duration-75"
-                referrerPolicy="no-referrer"
-              />
-            </motion.div>
-          </div>
-
-          <div className="absolute inset-x-0 bottom-12 flex flex-col items-center justify-center pointer-events-none p-4">
-            <h2 className="font-display text-xl md:text-2xl text-white tracking-widest mb-1 text-center">
-              {currentTrack.title}
-              {currentTrack.isLive && (
-                <motion.span 
-                  initial={{ opacity: 0, scale: 0.5 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  className="ml-3 inline-flex items-center gap-1 bg-red-600 text-white px-2 py-0.5 rounded-md text-[8px] font-bold uppercase tracking-wider relative -top-1"
-                >
-                  <Radio size={8} /> Live
-                </motion.span>
-              )}
-            </h2>
-            <p className="text-gold text-[10px] md:text-xs uppercase tracking-[0.3em] opacity-80 mb-4">Fairway Dreams Studio</p>
-
-            {/* Signal Strength Meter */}
-            <div className="flex gap-1 h-8 items-end">
-              {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
-                <motion.div
-                  key={i}
-                  animate={{ 
-                    height: isPlaying ? [10, 32, 15, 28, 10] : 4,
-                    opacity: isPlaying ? [0.3, 1, 0.5, 1, 0.3] : 0.2
-                  }}
-                  transition={{ 
-                    duration: 0.5 + Math.random(), 
-                    repeat: Infinity,
-                    delay: i * 0.1 
-                  }}
-                  className="w-1 bg-gold rounded-full"
-                />
-              ))}
-            </div>
+          {/* Overlay Info - Moved to bottom-left */}
+          <div className="absolute left-6 bottom-8 md:bottom-12 flex items-center gap-4 pointer-events-none z-30">
+             <img 
+               ref={imageRef1}
+               src={currentTrack.art || '/src/assets/images/default_cover_1779345608057.png'} 
+               alt={currentTrack.title}
+               className="w-16 h-16 md:w-20 md:h-20 rounded-xl border border-white/20 object-cover shadow-2xl"
+               referrerPolicy="no-referrer"
+             />
+             <div className="flex flex-col drop-shadow-xl bg-black/40 p-2 rounded-lg backdrop-blur-md border border-white/5">
+                <h2 className="font-display text-lg md:text-xl text-white tracking-widest mb-0.5">
+                  {currentTrack.title}
+                  {currentTrack.isLive && (
+                    <motion.span 
+                      initial={{ opacity: 0, scale: 0.5 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className="ml-2 inline-flex items-center gap-1 bg-red-600 text-white px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider relative -top-0.5"
+                    >
+                      <Radio size={8} /> Live
+                    </motion.span>
+                  )}
+                </h2>
+                <p className="text-gold text-[9px] md:text-[10px] uppercase tracking-[0.2em] opacity-90">Fairway Dreams Studio</p>
+                
+                {/* Signal Strength Meter (Small) */}
+                <div className="flex gap-0.5 h-3 items-end mt-1.5 opacity-50">
+                  {[1, 2, 3, 4, 5].map((i) => (
+                    <motion.div
+                      key={i}
+                      animate={{ 
+                        height: isPlaying ? [3, 8, 4, 10, 3] : 2,
+                        opacity: isPlaying ? [0.4, 1, 0.5, 1, 0.4] : 0.2
+                      }}
+                      transition={{ 
+                        duration: 0.6 + Math.random(), 
+                        repeat: Infinity,
+                        delay: i * 0.1 
+                      }}
+                      className="w-[2px] bg-gold rounded-full"
+                    />
+                  ))}
+                </div>
+             </div>
           </div>
 
           {/* Track Metadata Badges */}
@@ -495,32 +509,19 @@ export const Player: React.FC<PlayerProps> = ({
             <div className="flex flex-col gap-4">
               <div className="flex flex-col md:flex-row md:items-center gap-3">
                 <span className="text-[10px] uppercase tracking-widest text-[var(--text-secondary)] hidden md:inline">Visualizer</span>
-                <div className="flex flex-wrap items-center justify-center gap-1.5 md:gap-1">
-                  {(['bars', 'wave', 'radial', 'particles', 'mirror', 'scope', 'tunnel', 'nebula', 'vortex', 'matrix', 'kaleidoscope', 'liquid', 'dna', 'galaxy', 'atom', 'blackhole', 'constellation'] as VisualizerMode[]).map((m) => (
-                    <button
-                      key={m}
-                      onClick={() => updateSetting('mode', m)}
-                      className={`relative px-3 py-1.5 md:py-1 rounded-full text-[9px] md:text-[10px] uppercase tracking-wider transition-all ${
-                        settings.mode === m 
-                          ? 'bg-gold/20 border border-gold/50 text-gold' 
-                          : 'bg-white/5 border border-white/5 text-zinc-500 hover:text-zinc-300'
-                      }`}
-                    >
-                      {m}
-                      {settings.mode === m && (
-                        <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 flex gap-0.5 h-1 items-end opacity-50">
-                          {[1, 2, 3].map(i => (
-                            <motion.div
-                              key={i}
-                              animate={{ height: [1, 4, 2, 3, 1] }}
-                              transition={{ duration: 1, repeat: Infinity, delay: i * 0.1 }}
-                              className="w-0.5 bg-gold rounded-full"
-                            />
-                          ))}
-                        </div>
-                      )}
-                    </button>
-                  ))}
+                <div className="relative">
+                  <select
+                    value={settings.mode}
+                    onChange={(e) => updateSetting('mode', e.target.value as VisualizerMode)}
+                    className="appearance-none bg-white/5 hover:bg-white/10 border border-white/10 text-gold text-[10px] uppercase tracking-wider rounded-full px-4 py-1.5 md:py-1.5 pr-8 outline-none focus:border-gold/50 cursor-pointer transition-all"
+                  >
+                    {(['bars', 'wave', 'radial', 'particles', 'mirror', 'scope', 'tunnel', 'nebula', 'vortex', 'matrix', 'kaleidoscope', 'liquid', 'dna', 'galaxy', 'atom', 'blackhole', 'constellation', 'cymatics', 'sacred-geometry', 'hologram'] as VisualizerMode[]).map((m) => (
+                      <option key={m} value={m} className="bg-black text-white">{m}</option>
+                    ))}
+                  </select>
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gold/70">
+                    <ChevronDown size={12} />
+                  </div>
                 </div>
               </div>
               
@@ -789,38 +790,36 @@ export const Player: React.FC<PlayerProps> = ({
                 isPlaying={isPlaying} 
                 onSettingsChange={onSettingsChange}
               />
-            </div>
-
-            {/* Centered focal art for Fullscreen */}
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <motion.div 
-                animate={{ 
-                  scale: isPlaying ? [1, 1.05, 1] : 1
-                }}
-                transition={{ 
-                  scale: { duration: 4, repeat: Infinity, ease: "easeInOut" }
-                }}
-                className="relative p-12 flex items-center justify-center"
-              >
-                 <motion.div 
-                   animate={{ rotate: isPlaying ? [0, 360] : 0 }}
-                   transition={{ duration: 60, repeat: Infinity, ease: "linear" }}
-                   className="absolute inset-0 rounded-full border border-gold/20 border-dashed animate-pulse opacity-50"
-                 />
-                 
-                 <motion.div 
-                   animate={{ rotate: isPlaying ? [360, 0] : 0 }}
-                   transition={{ duration: 45, repeat: Infinity, ease: "linear" }}
-                   className="absolute inset-4 rounded-full border border-gold/10 border-dotted"
-                 />
-
-                 <img 
-                  ref={imageRef2}
-                  src={currentTrack.art || '/src/assets/images/default_cover_1779345608057.png'} 
-                  alt={currentTrack.title}
-                  className="w-48 h-48 md:w-72 md:h-72 rounded-full border-4 border-gold/50 object-cover shadow-[0_0_50px_rgba(201,168,76,0.5)] relative z-10 transition-transform duration-75"
-                />
-              </motion.div>
+              <AnimatePresence>
+                {settings.showCenterImage && (
+                  <motion.div 
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.8 }}
+                    className="absolute inset-0 flex items-center justify-center pointer-events-none mix-blend-screen"
+                  >
+                    <motion.div
+                      animate={{ 
+                        scale: isPlaying ? [1, 1.05, 1] : 1,
+                        rotate: isPlaying ? [0, 360] : 0
+                      }}
+                      transition={{ 
+                        scale: { duration: 2, repeat: Infinity, ease: "easeInOut" },
+                        rotate: { duration: 40, repeat: Infinity, ease: "linear" }
+                      }}
+                      className="relative w-48 h-48 md:w-80 md:h-80"
+                    >
+                      <div className="absolute inset-0 rounded-full border border-gold/30 border-dashed animate-pulse" />
+                      <img 
+                        src={currentTrack.art || '/src/assets/images/default_cover_1779345608057.png'} 
+                        alt={currentTrack.title}
+                        className="w-full h-full rounded-full object-cover opacity-70 border border-white/10"
+                        referrerPolicy="no-referrer"
+                      />
+                    </motion.div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
 
             {/* Top Bar */}

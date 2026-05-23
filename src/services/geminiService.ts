@@ -8,6 +8,10 @@ export interface FrequencyReportData {
 }
 
 export async function generateFrequencyReport(data: FrequencyReportData) {
+  const cacheKey = `gemini_freq_${data.name.replace(/\s+/g, '_')}_${data.birthDate}_${new Date().toLocaleDateString()}`;
+  const cached = localStorage.getItem(cacheKey);
+  if (cached) return cached;
+
   const model = "gemini-3.1-pro-preview";
   
   const prompt = `
@@ -41,7 +45,11 @@ export async function generateFrequencyReport(data: FrequencyReportData) {
       }
     });
 
-    return response.text;
+    const result = response.text || "";
+    if (result) {
+      localStorage.setItem(cacheKey, result);
+    }
+    return result;
   } catch (error) {
     console.error("Error generating frequency report:", error);
     throw new Error("Failed to generate the frequency report. Please try again later.");
@@ -137,6 +145,10 @@ export async function getHebrewName(name: string): Promise<string> {
 }
 
 export async function generateDailyResonance(data: FrequencyReportData) {
+  const cacheKey = `gemini_daily_${data.name.replace(/\s+/g, '_')}_${data.birthDate}_${new Date().toLocaleDateString()}`;
+  const cached = localStorage.getItem(cacheKey);
+  if (cached) return cached;
+
   const model = "gemini-3-flash-preview";
   const today = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
   
@@ -164,7 +176,11 @@ export async function generateDailyResonance(data: FrequencyReportData) {
       }
     });
 
-    return response.text;
+    const result = response.text || "";
+    if (result) {
+      localStorage.setItem(cacheKey, result);
+    }
+    return result;
   } catch (error) {
     console.error("Error generating daily resonance:", error);
     throw error;

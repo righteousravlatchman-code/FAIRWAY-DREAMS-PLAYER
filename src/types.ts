@@ -41,7 +41,7 @@ export interface Playlist {
   updatedAt?: any;
 }
 
-export type VisualizerMode = 'bars' | 'wave' | 'radial' | 'particles' | 'mirror' | 'scope' | 'tunnel' | 'nebula' | 'vortex' | 'matrix' | 'kaleidoscope' | 'liquid' | 'dna' | 'galaxy' | 'atom' | 'blackhole' | 'constellation';
+export type VisualizerMode = 'bars' | 'wave' | 'radial' | 'particles' | 'mirror' | 'scope' | 'tunnel' | 'nebula' | 'vortex' | 'matrix' | 'kaleidoscope' | 'liquid' | 'dna' | 'galaxy' | 'atom' | 'blackhole' | 'constellation' | 'cymatics' | 'sacred-geometry' | 'hologram';
 
 export interface ThemeColors {
   primary: string;
@@ -57,6 +57,7 @@ export interface VisualizerSettings {
   sensitivity: number;
   intensity: number;
   customColor?: string;
+  showCenterImage?: boolean;
 }
 
 export interface SavedInsight {
@@ -64,6 +65,15 @@ export interface SavedInsight {
   trackId: string;
   trackTitle: string;
   content: string;
+  timestamp: number;
+}
+
+export interface Riff {
+  id: string;
+  name: string;
+  category: string;
+  midiData: number[];
+  annotation?: string;
   timestamp: number;
 }
 
