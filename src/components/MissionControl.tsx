@@ -26,8 +26,9 @@ import {
   compatibility,
   reduce
 } from '../services/numerologyService';
-import { generateDailyResonance } from '../services/geminiService';
+import { generateDailyResonance, generateMissionControlInsight } from '../services/geminiService';
 import Markdown from 'react-markdown';
+import ReactMarkdown from 'react-markdown';
 import { useToast } from './ToastProvider';
 import { useAudioNarrator } from '../hooks/useAudioNarrator';
 
@@ -40,9 +41,25 @@ export const MissionControl: React.FC<MissionControlProps> = ({ userData }) => {
   const [compResult, setCompResult] = useState<string | null>(null);
   const [dailyResonance, setDailyResonance] = useState<string | null>(null);
   const [loadingDaily, setLoadingDaily] = useState(false);
+  const [insights, setInsights] = useState<Record<string, string>>({});
+  const [loadingInsights, setLoadingInsights] = useState<Record<string, boolean>>({});
   const { isPlaying, audioLoading, toggleText, setAudioBuffer } = useAudioNarrator();
   
   const { showToast } = useToast();
+
+  const handleGenerateInsight = async (element: string, data: any) => {
+    if (insights[element]) return;
+    setLoadingInsights(prev => ({ ...prev, [element]: true }));
+    try {
+      const res = await generateMissionControlInsight(userData.name, userData.birthDate, element, data);
+      setInsights(prev => ({ ...prev, [element]: res }));
+      showToast(`Deep insight for ${element} received.`, "success");
+    } catch (err) {
+      showToast("Failed to retrieve deep systems insight.", "error");
+    } finally {
+      setLoadingInsights(prev => ({ ...prev, [element]: false }));
+    }
+  };
 
   const stats = useMemo(() => {
     const py = personalYear(userData.birthDate);
@@ -141,6 +158,24 @@ export const MissionControl: React.FC<MissionControlProps> = ({ userData }) => {
                 <p className="text-white font-display text-lg sm:text-xl">{stats.py}</p>
               </div>
             </div>
+
+            <div className="mt-6 pt-6 border-t border-white/10">
+              {!insights["Daily Directive"] ? (
+                 <button 
+                   onClick={() => handleGenerateInsight("Daily Directive", { directive: stats.directive, pd: stats.pd, pm: stats.pm, py: stats.py })}
+                   disabled={loadingInsights["Daily Directive"]}
+                   className="text-[10px] text-gold uppercase tracking-widest font-bold flex items-center gap-2 hover:text-white transition-colors"
+                 >
+                   {loadingInsights["Daily Directive"] ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
+                   Deep Insight
+                 </button>
+              ) : (
+                 <div className="markdown-body prose prose-invert prose-xs prose-gold max-w-none prose-headings:font-display prose-headings:text-xs prose-headings:uppercase prose-p:text-zinc-400 mt-2 text-xs leading-relaxed">
+                    <ReactMarkdown>{insights["Daily Directive"]}</ReactMarkdown>
+                 </div>
+              )}
+            </div>
+
           </div>
         </motion.div>
 
@@ -174,6 +209,24 @@ export const MissionControl: React.FC<MissionControlProps> = ({ userData }) => {
                 />
               </div>
             </div>
+
+            <div className="mt-4 pt-4 border-t border-gold/10">
+              {!insights["Wealth Window"] ? (
+                 <button 
+                   onClick={() => handleGenerateInsight("Wealth Window", { wealthDescription: stats.wealth, py: stats.py })}
+                   disabled={loadingInsights["Wealth Window"]}
+                   className="text-[10px] text-gold uppercase tracking-widest font-bold flex items-center gap-2 hover:text-white transition-colors"
+                 >
+                   {loadingInsights["Wealth Window"] ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
+                   Deep Insight
+                 </button>
+              ) : (
+                 <div className="markdown-body prose prose-invert prose-xs prose-gold max-w-none prose-headings:font-display prose-headings:text-xs prose-headings:uppercase prose-p:text-zinc-400 mt-2 text-xs leading-relaxed">
+                    <ReactMarkdown>{insights["Wealth Window"]}</ReactMarkdown>
+                 </div>
+              )}
+            </div>
+
           </div>
         </motion.div>
 
@@ -269,11 +322,33 @@ export const MissionControl: React.FC<MissionControlProps> = ({ userData }) => {
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: 'auto' }}
                   exit={{ opacity: 0, height: 0 }}
-                  className="p-4 rounded-2xl bg-white/5 border border-white/10"
                 >
-                  <p className="text-xs text-white leading-relaxed italic">
-                    {compResult}
-                  </p>
+                  <div className="p-4 rounded-2xl bg-white/5 border border-white/10">
+                    <p className="text-xs text-white leading-relaxed italic border-l-2 border-gold/50 pl-3">
+                      {compResult}
+                    </p>
+                  </div>
+                  
+                  <div className="mt-4 pt-4 border-t border-white/10">
+                    {!insights["Compatibility Matrix"] ? (
+                       <button 
+                         onClick={() => handleGenerateInsight("Compatibility Matrix", { 
+                           partner: compPartner, 
+                           result: compResult, 
+                           userLifePath: stats.lifePath 
+                         })}
+                         disabled={loadingInsights["Compatibility Matrix"]}
+                         className="text-[10px] text-gold uppercase tracking-widest font-bold flex items-center gap-2 hover:text-white transition-colors"
+                       >
+                         {loadingInsights["Compatibility Matrix"] ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
+                         Deep Insight
+                       </button>
+                    ) : (
+                       <div className="markdown-body prose prose-invert prose-xs prose-gold max-w-none prose-headings:font-display prose-headings:text-xs prose-headings:uppercase prose-p:text-zinc-400 mt-2 text-xs leading-relaxed">
+                          <ReactMarkdown>{insights["Compatibility Matrix"]}</ReactMarkdown>
+                       </div>
+                    )}
+                  </div>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -285,32 +360,51 @@ export const MissionControl: React.FC<MissionControlProps> = ({ userData }) => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
-          className="lg:col-span-2 glass-panel p-6 sm:p-8 rounded-3xl border border-white/5 flex flex-col md:flex-row items-center gap-6 sm:gap-8"
+          className="lg:col-span-2 glass-panel p-6 sm:p-8 rounded-3xl border border-white/5"
         >
-          <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-full border-2 border-gold/20 flex items-center justify-center relative flex-shrink-0">
-            <div className="absolute inset-0 rounded-full border border-gold/10 animate-ping opacity-20" />
-            <div className="text-center">
-              <p className="text-[7px] sm:text-[8px] uppercase tracking-widest text-zinc-500">Life Path</p>
-              <p className="text-white font-display text-3xl sm:text-4xl">{stats.lifePath}</p>
+          <div className="flex flex-col md:flex-row items-center md:items-start gap-6 sm:gap-8">
+            <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-full border-2 border-gold/20 flex items-center justify-center relative flex-shrink-0">
+              <div className="absolute inset-0 rounded-full border border-gold/10 animate-ping opacity-20" />
+              <div className="text-center">
+                <p className="text-[7px] sm:text-[8px] uppercase tracking-widest text-zinc-500">Life Path</p>
+                <p className="text-white font-display text-3xl sm:text-4xl">{stats.lifePath}</p>
+              </div>
             </div>
-          </div>
-          
-          <div className="flex-1 space-y-3 sm:space-y-4 text-center md:text-left">
-            <div className="flex items-center justify-center md:justify-start gap-2">
-              <Info size={12} className="text-gold sm:w-14 sm:h-14" />
-              <h4 className="text-white text-[10px] sm:text-xs uppercase tracking-widest">Energetic Signature</h4>
-            </div>
-            <p className="text-zinc-500 text-[10px] sm:text-xs leading-relaxed">
-              Your core vibration ({stats.lifePath}) is currently interacting with the {stats.py} Personal Year frequency. 
-              This creates a unique resonance window for {stats.py === 8 ? 'financial mastery' : 'strategic alignment'}.
-            </p>
-            <div className="flex justify-center md:justify-start gap-2">
-              <span className="px-2 sm:px-3 py-1 rounded-full bg-white/5 border border-white/10 text-[7px] sm:text-[8px] text-zinc-400 uppercase tracking-widest">
-                Frequency: {stats.lifePath}Hz
-              </span>
-              <span className="px-2 sm:px-3 py-1 rounded-full bg-white/5 border border-white/10 text-[7px] sm:text-[8px] text-zinc-400 uppercase tracking-widest">
-                Phase: {stats.py}/9
-              </span>
+            
+            <div className="flex-1 space-y-3 sm:space-y-4 text-center md:text-left w-full">
+              <div className="flex items-center justify-center md:justify-start gap-2">
+                <Info size={12} className="text-gold sm:w-14 sm:h-14" />
+                <h4 className="text-white text-[10px] sm:text-xs uppercase tracking-widest">Energetic Signature</h4>
+              </div>
+              <p className="text-zinc-500 text-[10px] sm:text-xs leading-relaxed">
+                Your core vibration ({stats.lifePath}) is currently interacting with the {stats.py} Personal Year frequency. 
+                This creates a unique resonance window for {stats.py === 8 ? 'financial mastery' : 'strategic alignment'}.
+              </p>
+              <div className="flex justify-center md:justify-start gap-2">
+                <span className="px-2 sm:px-3 py-1 rounded-full bg-white/5 border border-white/10 text-[7px] sm:text-[8px] text-zinc-400 uppercase tracking-widest">
+                  Frequency: {stats.lifePath}Hz
+                </span>
+                <span className="px-2 sm:px-3 py-1 rounded-full bg-white/5 border border-white/10 text-[7px] sm:text-[8px] text-zinc-400 uppercase tracking-widest">
+                  Phase: {stats.py}/9
+                </span>
+              </div>
+
+              <div className="mt-4 pt-4 border-t border-white/10 text-left">
+                {!insights["Energetic Signature"] ? (
+                  <button 
+                    onClick={() => handleGenerateInsight("Energetic Signature", { lifePath: stats.lifePath, personalYear: stats.py })}
+                    disabled={loadingInsights["Energetic Signature"]}
+                    className="text-[10px] text-gold uppercase tracking-widest font-bold flex items-center gap-2 hover:text-white transition-colors justify-center md:justify-start w-full"
+                  >
+                    {loadingInsights["Energetic Signature"] ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
+                    Deep Insight
+                  </button>
+                ) : (
+                  <div className="markdown-body prose prose-invert prose-xs prose-gold max-w-none prose-headings:font-display prose-headings:text-xs prose-headings:uppercase prose-p:text-zinc-400 mt-2 text-xs leading-relaxed">
+                      <ReactMarkdown>{insights["Energetic Signature"]}</ReactMarkdown>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </motion.div>

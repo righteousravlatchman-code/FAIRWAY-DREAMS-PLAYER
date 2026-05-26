@@ -18,6 +18,14 @@ export interface MediaItem {
   streamUrl?: string;
 }
 
+export interface LiveReaction {
+  id: string;
+  type: 'heart' | 'fire' | 'star' | 'sparkle';
+  userId: string;
+  timestamp: any;
+  xPos: number;
+}
+
 export interface LiveMessage {
   id: string;
   userId: string;
@@ -41,7 +49,7 @@ export interface Playlist {
   updatedAt?: any;
 }
 
-export type VisualizerMode = 'bars' | 'wave' | 'radial' | 'particles' | 'mirror' | 'scope' | 'tunnel' | 'nebula' | 'vortex' | 'matrix' | 'kaleidoscope' | 'liquid' | 'dna' | 'galaxy' | 'atom' | 'blackhole' | 'constellation' | 'cymatics' | 'sacred-geometry' | 'hologram';
+export type VisualizerMode = 'bars' | 'wave' | 'radial' | 'particles' | 'mirror' | 'scope' | 'tunnel' | 'nebula' | 'vortex' | 'matrix' | 'kaleidoscope' | 'liquid' | 'dna' | 'galaxy' | 'atom' | 'blackhole' | 'constellation' | 'cymatics' | 'sacred-geometry' | 'hologram' | 'us-pulse-echo' | 'us-color-doppler' | 'us-beam-profile' | 'us-attenuation' | 'doppler';
 
 export interface ThemeColors {
   primary: string;

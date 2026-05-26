@@ -18,6 +18,7 @@ export const Visualizer: React.FC<VisualizerProps> = ({ analyser, settings, them
   const shakeRef = useRef(0);
   const chromaticRef = useRef(0);
   const lastAvgRef = useRef(0);
+  const dopplerHistory = useRef<number[][]>([]);
   const { mode, speed, sensitivity, intensity } = settings;
 
   const handleInteraction = (e: React.MouseEvent | React.TouchEvent) => {
@@ -82,7 +83,7 @@ export const Visualizer: React.FC<VisualizerProps> = ({ analyser, settings, them
 
   const handleDoubleClick = () => {
     if (!onSettingsChange) return;
-    const modes: VisualizerMode[] = ['bars', 'wave', 'radial', 'particles', 'mirror', 'scope', 'tunnel', 'nebula', 'vortex', 'matrix', 'kaleidoscope', 'liquid', 'dna', 'galaxy', 'atom', 'blackhole', 'constellation', 'cymatics', 'sacred-geometry', 'hologram'];
+    const modes: VisualizerMode[] = ['bars', 'wave', 'radial', 'particles', 'mirror', 'scope', 'tunnel', 'nebula', 'vortex', 'matrix', 'kaleidoscope', 'liquid', 'dna', 'galaxy', 'atom', 'blackhole', 'constellation', 'cymatics', 'sacred-geometry', 'hologram', 'us-pulse-echo', 'us-color-doppler', 'us-beam-profile', 'us-attenuation', 'doppler'];
     const currentIndex = modes.indexOf(settings.mode);
     const nextIndex = (currentIndex + 1) % modes.length;
     
@@ -225,6 +226,11 @@ export const Visualizer: React.FC<VisualizerProps> = ({ analyser, settings, them
     else if (mode === 'cymatics') drawCymatics(ctx, dataArray, timeData, W, H, theme, pulse, settings);
     else if (mode === 'sacred-geometry') drawSacredGeometry(ctx, dataArray, timeData, W, H, theme, pulse, settings);
     else if (mode === 'hologram') drawHologram(ctx, dataArray, timeData, W, H, theme, pulse, settings);
+    else if (mode === 'us-pulse-echo') drawUSPulseEcho(ctx, dataArray, timeData, W, H, theme, pulse, settings);
+    else if (mode === 'us-color-doppler') drawUSColorDoppler(ctx, dataArray, timeData, W, H, theme, pulse, settings);
+    else if (mode === 'us-beam-profile') drawUSBeamProfile(ctx, dataArray, W, H, theme, pulse, settings);
+    else if (mode === 'us-attenuation') drawUSAttenuation(ctx, dataArray, W, H, theme, pulse, settings);
+    else if (mode === 'doppler') drawDoppler(ctx, dataArray, timeData, W, H, theme, pulse, settings);
 
     // Dynamic High-Energy Flash Effect
     if (chromaticRef.current > 5) {
@@ -260,6 +266,25 @@ export const Visualizer: React.FC<VisualizerProps> = ({ analyser, settings, them
     const scanlineDrift = (Date.now() / 40) % 4;
     for (let i = -4; i < H; i += 4) {
       ctx.fillRect(0, i + scanlineDrift, W, 1);
+    }
+
+    // Dynamic Film Grain / Stardust overlay
+    ctx.fillStyle = `rgba(255, 255, 255, ${0.015 + pulse * 0.03})`;
+    for(let i = 0; i < 150 * intensity; i++) {
+       ctx.fillRect(Math.random() * W, Math.random() * H, 1.5, 1.5);
+    }
+    
+    // Lens Flare on intense peaks
+    if (pulse > 0.8) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'screen';
+      const flareGrad = ctx.createLinearGradient(0, H/2 - 2, W, H/2 + 2);
+      flareGrad.addColorStop(0, 'transparent');
+      flareGrad.addColorStop(0.5, `${theme.accent}80`);
+      flareGrad.addColorStop(1, 'transparent');
+      ctx.fillStyle = flareGrad;
+      ctx.fillRect(0, Math.random() * H, W, 4 + pulse * 6);
+      ctx.restore();
     }
 
 
@@ -440,9 +465,9 @@ export const Visualizer: React.FC<VisualizerProps> = ({ analyser, settings, them
   };
 
   const drawBars = (ctx: CanvasRenderingContext2D, d: Uint8Array, W: number, H: number, theme: ThemeColors, pulse: number, s: VisualizerSettings) => {
-    const n = 48; // Higher density for premium detail
+    const n = 64; // Higher density for premium detail
     const slot = W / n;
-    const bw = slot * 0.72;
+    const bw = slot * 0.55;
     const primaryColor = s.customColor || theme.primary;
 
     if (peaks.current.length !== n) {
@@ -451,87 +476,81 @@ export const Visualizer: React.FC<VisualizerProps> = ({ analyser, settings, them
 
     ctx.save();
     
-    // Draw cyber-spectrogram background frequency line grid markers
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.02)';
-    ctx.lineWidth = 1;
-    for (let i = 1; i <= 6; i++) {
-      const lineY = (H / 7) * i;
-      ctx.beginPath();
-      ctx.moveTo(0, lineY);
-      ctx.lineTo(W, lineY);
-      ctx.stroke();
+    // Abstract grid plane
+    ctx.strokeStyle = `${primaryColor}15`;
+    const gridRows = 5;
+    for (let i = 1; i <= gridRows; i++) {
+        const py = H/2 + Math.pow(i/gridRows, 2) * (H/2);
+        ctx.beginPath(); ctx.moveTo(0, py); ctx.lineTo(W, py); ctx.stroke();
+        const ny = H/2 - Math.pow(i/gridRows, 2) * (H/2);
+        ctx.beginPath(); ctx.moveTo(0, ny); ctx.lineTo(W, ny); ctx.stroke();
     }
 
-    // Centered horizon line
+    // Glowing core axis
     ctx.beginPath();
     ctx.moveTo(0, H / 2);
     ctx.lineTo(W, H / 2);
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
-    ctx.lineWidth = 1;
+    ctx.strokeStyle = `${theme.accent}44`;
+    ctx.lineWidth = 1 + pulse * 2;
     ctx.stroke();
 
     for (let i = 0; i < n; i++) {
       const val = Math.pow((d[Math.floor(i * d.length / n)] / 255) * s.sensitivity, 0.85);
-      // Equalizer bars spread symmetrically upwards and downwards from center axis
-      const bh = val * (H * 0.38) * s.intensity;
-      const x = i * slot + slot * 0.14;
+      const bh = val * (H * 0.42) * s.intensity;
+      const x = i * slot + slot * 0.2;
       
-      // Upward segment rendering
-      const segments = 14;
-      const segmentHeight = Math.max(1, bh / segments);
+      const segments = 18;
+      const gap = 2;
       
-      for (let j = 0; j < segments; j++) {
-        const segY = (H / 2) - (j * bh / segments);
-        const ratio = j / segments;
-        
-        ctx.fillStyle = ratio < 0.5 
-          ? `${primaryColor}${Math.floor((1 - ratio) * 230).toString(16).padStart(2, '0')}` 
-          : (ratio < 0.82 
-            ? `${theme.secondary}d0` 
-            : `${theme.accent}d0`);
-            
-        ctx.fillRect(x, segY - segmentHeight + 1, bw, segmentHeight - 1);
-        
-        // Symmetrical downward column rendering
-        const segYDown = (H / 2) + (j * bh / segments);
-        ctx.fillRect(x, segYDown, bw, segmentHeight - 1);
-      }
-
-      // Floating dynamic tip peaks tracking
-      if (bh > peaks.current[i]) {
-        peaks.current[i] = bh;
-      } else {
-        peaks.current[i] -= 1.8 * s.speed;
-      }
-
-      const peakOffset = peaks.current[i];
-      if (peakOffset > 2) {
-        ctx.fillStyle = theme.accent;
-        // Upper peak indicator
-        ctx.fillRect(x, (H / 2) - peakOffset - 3, bw, 2);
-        // Lower peak indicator
-        ctx.fillRect(x, (H / 2) + peakOffset + 1, bw, 2);
-        
-        // Shiny flare at peaks
-        if (val > 0.85) {
-          ctx.save();
-          ctx.shadowBlur = 12 * s.intensity;
-          ctx.shadowColor = theme.accent;
-          ctx.fillStyle = '#ffffff';
-          ctx.fillRect(x, (H / 2) - peakOffset - 4, bw, 2);
-          ctx.fillRect(x, (H / 2) + peakOffset + 2, bw, 2);
-          ctx.restore();
+      if (bh > 0) {
+        // Compute discrete segments
+        let covered = 0;
+        let j = 0;
+        while (covered < bh && j < segments) {
+           const segHeight = Math.max(2, (bh / segments) - gap);
+           const segYOffset = covered;
+           const ratio = j / segments;
+           
+           ctx.fillStyle = ratio < 0.4 
+             ? `${primaryColor}${Math.floor((1 - ratio) * 255).toString(16).padStart(2, '0')}` 
+             : (ratio < 0.7 
+               ? `${theme.secondary}e0` 
+               : `${theme.accent}f0`);
+               
+           // Upper
+           ctx.fillRect(x, (H / 2) - segYOffset - segHeight, bw, segHeight);
+           // Lower mirror
+           ctx.fillRect(x, (H / 2) + segYOffset, bw, segHeight);
+           
+           covered += segHeight + gap;
+           j++;
         }
       }
 
-      // Subtle Wet mirror reflections under the bars
-      ctx.save();
-      ctx.globalAlpha = 0.08 * (1 - (i / n) * 0.15);
-      ctx.translate(0, H);
-      ctx.scale(1, -0.3);
-      ctx.fillStyle = primaryColor;
-      ctx.fillRect(x, 0, bw, bh);
-      ctx.restore();
+      if (bh > peaks.current[i]) {
+        peaks.current[i] = bh;
+      } else {
+        peaks.current[i] -= 2.0 * s.speed;
+      }
+
+      const peakOffset = peaks.current[i];
+      if (peakOffset > 4) {
+        ctx.save();
+        ctx.shadowBlur = 15 + pulse * 10;
+        ctx.shadowColor = theme.accent;
+        ctx.fillStyle = val > 0.8 ? '#ffffff' : theme.accent;
+        
+        ctx.fillRect(x, (H / 2) - peakOffset - 4, bw, 3);
+        ctx.fillRect(x, (H / 2) + peakOffset + 1, bw, 3);
+        
+        // Laser strand connecting peak to base
+        if (peakOffset > H * 0.2) {
+           ctx.fillStyle = `${theme.accent}22`;
+           ctx.fillRect(x + bw/2 - 0.5, (H/2) - peakOffset, 1, peakOffset);
+           ctx.fillRect(x + bw/2 - 0.5, H/2, 1, peakOffset);
+        }
+        ctx.restore();
+      }
     }
     
     ctx.restore();
@@ -544,82 +563,97 @@ export const Visualizer: React.FC<VisualizerProps> = ({ analyser, settings, them
     
     ctx.save();
     
-    // Wave 1: Ambient golden filling underlay (smooth Bezier interpolation)
-    ctx.beginPath();
-    ctx.moveTo(0, H);
-    
-    let points1: {x: number, y: number}[] = [];
-    for (let i = 0; i < t.length; i += 4) {
-      const v = ((t[i] / 255) - 0.5) * H * 0.55 * s.sensitivity * s.intensity;
-      points1.push({ x: i * step, y: midY + v * 0.6 });
-    }
-    
-    ctx.moveTo(0, midY);
-    for (let i = 0; i < points1.length - 1; i++) {
-      const xc = (points1[i].x + points1[i+1].x) / 2;
-      const yc = (points1[i].y + points1[i+1].y) / 2;
-      ctx.quadraticCurveTo(points1[i].x, points1[i].y, xc, yc);
-    }
-    ctx.lineTo(W, H);
-    ctx.lineTo(0, H);
-    const grad1 = ctx.createLinearGradient(0, midY, 0, H);
-    grad1.addColorStop(0, `${theme.secondary}1a`);
-    grad1.addColorStop(0.7, `${primaryColor}08`);
-    grad1.addColorStop(1, 'transparent');
-    ctx.fillStyle = grad1;
-    ctx.fill();
+    // Draw 3D wireframe mesh effect using pseudo-depth layering
+    const layers = 5;
+    for (let l = layers; l >= 0; l--) {
+      // Depth scaling and perspective fading
+      const depthScale = 1 - (l * 0.15);
+      const yOffset = l * 35;
+      const alpha = 1 - (l * 0.18);
+      
+      const layerColor = l === 0 ? primaryColor : theme.secondary;
+      
+      ctx.beginPath();
+      let points: {x: number, y: number}[] = [];
+      for (let i = 0; i < t.length; i += 2) {
+        const rawVal = t[i];
+        // add phase shifts for each layer to simulate traveling waves
+        const phase = i * 0.04 + Date.now() * 0.003 * s.speed + (l * 1.5);
+        const offset = Math.sin(phase) * 20 * depthScale;
+        const v = ((rawVal / 255) - 0.5) * H * 0.7 * s.sensitivity * s.intensity * depthScale + offset;
+        
+        points.push({ 
+             x: (i * step - W/2) * depthScale + W/2, 
+             y: midY + v + yOffset 
+        });
+      }
+      
+      if (points.length === 0) continue;
+      
+      ctx.moveTo(points[0].x, points[0].y);
+      for (let i = 0; i < points.length - 1; i++) {
+        const xc = (points[i].x + points[i+1].x) / 2;
+        const yc = (points[i].y + points[i+1].y) / 2;
+        ctx.quadraticCurveTo(points[i].x, points[i].y, xc, yc);
+      }
+      
+      // Wireframe styling
+      ctx.strokeStyle = `${layerColor}${Math.floor(alpha * 255).toString(16).padStart(2, '0')}`;
+      ctx.lineWidth = l === 0 ? 3 * s.intensity : 1;
+      if (l === 0) {
+          ctx.shadowBlur = 15;
+          ctx.shadowColor = primaryColor;
+      } else {
+          ctx.shadowBlur = 0;
+      }
+      ctx.stroke();
 
-    // Wave 2: Liquid fluid Ribbon with translucent gradients
-    ctx.beginPath();
-    let points2: {x: number, y: number}[] = [];
-    for (let i = 0; i < t.length; i += 2) {
-      const rawVal = t[i];
-      const offset = Math.sin(i * 0.04 + Date.now() * 0.002 * s.speed) * 15;
-      const v = ((rawVal / 255) - 0.5) * H * 0.78 * s.sensitivity * s.intensity + offset;
-      points2.push({ x: i * step, y: midY + v * 0.82 });
-    }
-    
-    ctx.moveTo(points2[0].x, points2[0].y);
-    for (let i = 0; i < points2.length - 1; i++) {
-      const xc = (points2[i].x + points2[i+1].x) / 2;
-      const yc = (points2[i].y + points2[i+1].y) / 2;
-      ctx.quadraticCurveTo(points2[i].x, points2[i].y, xc, yc);
-    }
-    ctx.strokeStyle = primaryColor;
-    ctx.lineWidth = 3.5 * s.intensity;
-    ctx.shadowBlur = 18 * s.intensity;
-    ctx.shadowColor = primaryColor;
-    ctx.stroke();
-    ctx.shadowBlur = 0;
+      // Draw faint connections between adjacent points to simulate mesh grid
+      if (l < layers && l % 2 === 0) {
+          ctx.strokeStyle = `${theme.accent}${Math.floor(alpha * 40).toString(16).padStart(2, '0')}`;
+          ctx.lineWidth = 0.5;
+          ctx.beginPath();
+          for (let i = 0; i < points.length; i += 12) {
+              ctx.moveTo(points[i].x, points[i].y);
+              // Pseudo-connect to layer below
+              ctx.lineTo(points[i].x, points[i].y + 35); 
+          }
+          ctx.stroke();
+      }
 
-    // Drawing sparkling peak crest flares
-    ctx.fillStyle = '#ffffff';
-    for (let i = 0; i < points2.length; i += 8) {
-      const p = points2[i];
-      const dy = Math.abs(p.y - midY);
-      if (dy > H * 0.20 && Math.random() > 0.6) {
-        ctx.save();
-        ctx.shadowBlur = 10;
-        ctx.shadowColor = theme.accent;
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, 2.5 * s.intensity, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
+      // Sparkles on front layer
+      if (l === 0) {
+        ctx.fillStyle = '#ffffff';
+        for (let i = 0; i < points.length; i += 6) {
+          const p = points[i];
+          const dy = Math.abs(p.y - midY);
+          if (dy > H * 0.15 && Math.random() > 0.6) {
+            ctx.save();
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = theme.accent;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, 2 * s.intensity + pulse*2, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+          }
+        }
       }
     }
-
-    // Wave 3: High Frequency sharp laser line
+    
+    // Core high frequency laser at absolute zero depth
     ctx.beginPath();
     ctx.moveTo(0, midY);
-    for (let i = 0; i < t.length; i += 6) {
-      const v = ((t[i] / 255) - 0.5) * H * 0.88 * s.sensitivity * s.intensity;
+    for (let i = 0; i < t.length; i += 4) {
+      const v = ((t[i] / 255) - 0.5) * H * 0.9 * s.sensitivity * s.intensity;
       const x = i * step;
-      const y = midY + v + Math.cos(i * 0.12 + Date.now() * 0.008 * s.speed) * 8 * pulse;
+      const y = midY + v + Math.cos(i * 0.15 + Date.now() * 0.01 * s.speed) * 6;
       if (i === 0) ctx.moveTo(x, y);
       else ctx.lineTo(x, y);
     }
     ctx.strokeStyle = theme.accent;
-    ctx.lineWidth = 1 * s.intensity;
+    ctx.lineWidth = 1 * s.intensity + pulse * 2;
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = theme.accent;
     ctx.stroke();
 
     ctx.restore();
@@ -631,54 +665,64 @@ export const Visualizer: React.FC<VisualizerProps> = ({ analyser, settings, them
     const minDim = Math.min(W, H);
     
     // Core radial boundaries
-    const r0 = minDim * 0.18 + pulse * 25; 
-    const r1 = minDim * 0.48 * s.intensity;
+    const r0 = minDim * 0.15 + pulse * 15; 
+    const r1 = minDim * 0.45 * s.intensity;
     const primaryColor = s.customColor || theme.primary;
 
     ctx.save();
     
-    // Draw backing solar bloom/deep glow
-    const radialBloom = ctx.createRadialGradient(cx, cy, r0 * 0.4, cx, cy, r0 * 1.9);
-    radialBloom.addColorStop(0, `${primaryColor}b8`);
-    radialBloom.addColorStop(0.4, `${theme.secondary}38`);
+    // Draw backing reactor glow
+    const radialBloom = ctx.createRadialGradient(cx, cy, r0 * 0.2, cx, cy, r0 * 2.5);
+    radialBloom.addColorStop(0, `${primaryColor}88`);
+    radialBloom.addColorStop(0.5, `${theme.secondary}22`);
     radialBloom.addColorStop(1, 'transparent');
     ctx.fillStyle = radialBloom;
     ctx.beginPath();
-    ctx.arc(cx, cy, r0 * 1.9, 0, Math.PI * 2);
+    ctx.arc(cx, cy, r0 * 2.5, 0, Math.PI * 2);
     ctx.fill();
 
-    // Concentric EQ dials in background (Bass & Vocal mid-range trackers)
-    ctx.strokeStyle = `${theme.secondary}12`;
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.arc(cx, cy, r0 * 1.25, 0, Math.PI * 2);
-    ctx.stroke();
-
-    ctx.strokeStyle = `${primaryColor}0c`;
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.arc(cx, cy, r0 * 1.45, 0, Math.PI * 2);
-    ctx.stroke();
-
-    // Orbital satellite tracking dots
-    const orbitAngle = (Date.now() / 1200) * s.speed;
-    ctx.fillStyle = theme.accent;
-    ctx.beginPath();
-    ctx.arc(cx + Math.cos(orbitAngle) * (r0 * 1.25), cy + Math.sin(orbitAngle) * (r0 * 1.25), 3.5 + pulse * 2, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.fillStyle = primaryColor;
-    ctx.beginPath();
-    ctx.arc(cx - Math.cos(orbitAngle * 1.4) * (r0 * 1.45), cy - Math.sin(orbitAngle * 1.4) * (r0 * 1.45), 2.5 + pulse * 1.5, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Sunburst flares
+    // High tech segmented inner ring
+    const orbitAngle = (Date.now() / 2000) * s.speed;
+    ctx.save();
     ctx.translate(cx, cy);
-    ctx.rotate(Date.now() * 0.00025 * s.speed);
+    ctx.rotate(orbitAngle);
+    ctx.strokeStyle = `${theme.accent}aa`;
+    ctx.lineWidth = 2;
+    for(let i=0; i<36; i++) {
+        if(i % 3 === 0) continue; // Gap
+        ctx.beginPath();
+        ctx.arc(0, 0, r0 * 0.85, (i * 10) * Math.PI/180, (i * 10 + 5) * Math.PI/180);
+        ctx.stroke();
+    }
+    ctx.restore();
+
+    // Secondary dashed counter-rotating ring
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(-orbitAngle * 1.5);
+    ctx.strokeStyle = `${primaryColor}66`;
+    ctx.lineWidth = 1;
+    for(let i=0; i<120; i++) {
+        const active = i % 10 < 5;
+        if(active) {
+          ctx.beginPath();
+          ctx.moveTo(r0 * 0.95, 0);
+          ctx.lineTo(r0 * 0.98, 0);
+          ctx.stroke();
+        }
+        ctx.rotate((Math.PI * 2) / 120);
+    }
+    ctx.restore();
+
+    // Main spectrum sunburst flares
+    ctx.save();
+    ctx.translate(cx, cy);
+    // Slight rotation to the spectrum itself
+    ctx.rotate(Date.now() * 0.0001 * s.speed);
     
-    const slice = (Math.PI * 2) / 108;
-    for (let i = 0; i < 108; i++) {
-      const dIndex = Math.floor(i * d.length / 108);
+    const slice = (Math.PI * 2) / 128;
+    for (let i = 0; i < 128; i++) {
+      const dIndex = Math.floor(i * d.length / 128);
       const val = Math.pow((d[dIndex] / 255) * s.sensitivity, 0.85);
       const len = (r1 - r0) * val;
       if (len < 1) continue;
@@ -687,46 +731,48 @@ export const Visualizer: React.FC<VisualizerProps> = ({ analyser, settings, them
       const x1 = Math.cos(angle) * r0;
       const y1 = Math.sin(angle) * r0;
       
-      // Curved magnetic solar flares
-      const curveFactor = 0.09 * s.intensity * val;
-      const x2 = Math.cos(angle + curveFactor) * (r0 + len);
-      const y2 = Math.sin(angle + curveFactor) * (r0 + len);
+      const x2 = Math.cos(angle) * (r0 + len);
+      const y2 = Math.sin(angle) * (r0 + len);
 
+      // Tech style straight beams with outer dot
       ctx.beginPath();
       ctx.moveTo(x1, y1);
-      ctx.quadraticCurveTo(
-        Math.cos(angle + curveFactor * 0.5) * (r0 + len * 0.5),
-        Math.sin(angle + curveFactor * 0.5) * (r0 + len * 0.5),
-        x2, y2
-      );
+      ctx.lineTo(x2, y2);
       
-      const g = ctx.createLinearGradient(x1, y1, x2, y2);
-      g.addColorStop(0, primaryColor);
-      g.addColorStop(0.5, theme.secondary);
-      g.addColorStop(1, theme.accent);
-      
-      ctx.strokeStyle = g;
-      ctx.lineWidth = (W / 460) * s.intensity * (val + 0.45);
-      ctx.lineCap = 'round';
+      ctx.strokeStyle = val > 0.7 ? theme.accent : (val > 0.4 ? primaryColor : `${theme.secondary}99`);
+      ctx.lineWidth = (W / 600) * s.intensity * (val + 0.5);
+      ctx.lineCap = 'butt'; // Tech-like flat caps
       ctx.stroke();
       
-      // Solar stardust flares spitting off tips
-      if (val > 0.8 && Math.random() > 0.8) {
-        ctx.fillStyle = '#ffffff';
-        ctx.beginPath();
-        ctx.arc(
-          x2 + (Math.random() - 0.5) * 10,
-          y2 + (Math.random() - 0.5) * 10,
-          1.5 * s.intensity,
-          0, Math.PI * 2
-        );
-        ctx.fill();
+      // Outer floating dot tracking peak
+      if (val > 0.2) {
+          const dx = Math.cos(angle) * (r0 + len + 8);
+          const dy = Math.sin(angle) * (r0 + len + 8);
+          ctx.fillStyle = val > 0.8 ? '#ffffff' : primaryColor;
+          ctx.beginPath();
+          ctx.arc(dx, dy, 1.5 * s.intensity, 0, Math.PI * 2);
+          ctx.fill();
       }
     }
-    
-    // Core Central Rings (High-end HUD-style)
     ctx.restore();
     
+    // Draw angular targeting reticles
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.strokeStyle = `${theme.accent}dd`;
+    ctx.lineWidth = 1.5;
+    for (let i = 0; i < 4; i++) {
+      ctx.rotate(Math.PI / 2);
+      ctx.beginPath();
+      ctx.moveTo(r0 * 1.5, r0 * 1.5);
+      ctx.lineTo(r0 * 1.5 - 20, r0 * 1.5);
+      ctx.moveTo(r0 * 1.5, r0 * 1.5);
+      ctx.lineTo(r0 * 1.5, r0 * 1.5 - 20);
+      ctx.stroke();
+    }
+    ctx.restore();
+    
+    // Core Central Rings
     ctx.beginPath();
     ctx.arc(cx, cy, r0, 0, Math.PI * 2);
     ctx.strokeStyle = primaryColor;
@@ -2012,6 +2058,397 @@ export const Visualizer: React.FC<VisualizerProps> = ({ analyser, settings, them
     ctx.fillStyle = 'rgba(255,255,255,0.05)';
     ctx.fillRect(0, bandY, W, 80);
 
+    ctx.restore();
+  };
+
+  const drawUSPulseEcho = (ctx: CanvasRenderingContext2D, d: Uint8Array, timeData: Uint8Array, W: number, H: number, theme: ThemeColors, pulse: number, s: VisualizerSettings) => {
+    // Top-down scan lines (piezo elements to depth) simulating pulse-echo
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+    ctx.fillRect(0, 0, W, H);
+    
+    const elements = 64;
+    const spacing = W / elements;
+    const time = Date.now() * 0.002 * s.speed;
+
+    ctx.save();
+    ctx.globalCompositeOperation = 'screen';
+    
+    // Transducer footprint at the top
+    ctx.fillStyle = '#444';
+    ctx.fillRect(0, 0, W, 20);
+
+    for (let i = 0; i < elements; i++) {
+        const x = i * spacing + spacing / 2;
+        const val = (d[Math.floor((i / elements) * d.length)] || 0) / 255;
+        
+        // Pulse traveling down
+        const pulseY = (time * 200 + i * 5) % (H + 100);
+        
+        // Echo traveling up (reflected)
+        const echoY = H - ((time * 150 + i * 3) % H);
+        
+        // Draw pulse
+        ctx.fillStyle = `rgba(100, 200, 255, ${0.8 * val * s.intensity})`;
+        ctx.fillRect(x - 2, pulseY, 4, 15);
+        
+        // Draw echo (brighter when it meets high amplitude from data)
+        ctx.fillStyle = `rgba(201, 168, 76, ${val * s.intensity})`;
+        ctx.beginPath();
+        ctx.arc(x, echoY, 2 + val * 5, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Draw depth scatter points
+        if (Math.random() > 0.9) {
+            ctx.fillStyle = `rgba(255,255,255,${0.1 * val})`;
+            ctx.fillRect(x + (Math.random()-0.5)*10, Math.random()*H, 2, 2);
+        }
+    }
+    
+    ctx.restore();
+  };
+
+  const drawUSColorDoppler = (ctx: CanvasRenderingContext2D, d: Uint8Array, timeData: Uint8Array, W: number, H: number, theme: ThemeColors, pulse: number, s: VisualizerSettings) => {
+    // B-mode background (Grayscale)
+    ctx.fillStyle = 'rgba(10, 10, 10, 0.1)';
+    ctx.fillRect(0, 0, W, H);
+
+    ctx.save();
+    
+    // Simulating B-mode speckle background
+    for (let i = 0; i < 200; i++) {
+        ctx.fillStyle = `rgba(255,255,255,${Math.random() * 0.05})`;
+        ctx.fillRect(Math.random() * W, Math.random() * H, 2 + Math.random() * 3, 2 + Math.random() * 3);
+    }
+    
+    // Doppler Color box (BART: Blue Away, Red Towards)
+    const boxW = W * 0.5;
+    const boxH = H * 0.4;
+    const boxX = W / 2 - boxW / 2 + Math.sin(Date.now()*0.001)*50;
+    const boxY = H / 2 - boxH / 2;
+    
+    // Parallelogram box (steering)
+    ctx.beginPath();
+    ctx.moveTo(boxX + 40, boxY);
+    ctx.lineTo(boxX + boxW + 40, boxY);
+    ctx.lineTo(boxX + boxW, boxY + boxH);
+    ctx.lineTo(boxX, boxY + boxH);
+    ctx.closePath();
+    ctx.strokeStyle = `rgba(255,255,255,0.3)`;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    
+    // Clip to color box
+    ctx.clip();
+    
+    ctx.globalCompositeOperation = 'screen';
+    
+    const cols = 20;
+    const rows = 15;
+    const cW = boxW / cols;
+    const cH = boxH / rows;
+    
+    for (let i = 0; i < cols; i++) {
+        for (let j = 0; j < rows; j++) {
+            const dataIndex = Math.floor(((i + j*cols)/(cols*rows)) * d.length);
+            const val = ((d[dataIndex] || 128) / 255) - 0.5; // -0.5 to 0.5
+            const scaledVal = val * 2.0; 
+            
+            // Apply a flow profile
+            const centerDist = Math.abs((j/rows) - 0.5) * 2; // 0 at center, 1 at edges
+            const flowVelocity = scaledVal * (1 - centerDist) * pulse * s.intensity; // Parabolic flow profile
+            
+            if (Math.abs(flowVelocity) > 0.05) {
+                // Towards = Red/Yellow, Away = Blue/Cyan
+                let color = flowVelocity > 0 
+                  ? `rgba(255, ${Math.floor(flowVelocity*255)}, 0, ${Math.abs(flowVelocity)})` 
+                  : `rgba(0, ${Math.floor(Math.abs(flowVelocity)*255)}, 255, ${Math.abs(flowVelocity)})`;
+                  
+                if (Math.abs(flowVelocity) > 0.8) {
+                    // Aliasing!
+                    color = flowVelocity > 0 ? `rgba(0, 255, 255, 0.9)` : `rgba(255, 255, 0, 0.9)`;
+                }
+
+                ctx.fillStyle = color;
+                // Add steering offset for parallelogram
+                const steerOffset = ((boxH - (j * cH)) / boxH) * 40;
+                ctx.fillRect(boxX + i * cW + steerOffset, boxY + j * cH, cW * 1.5, cH * 1.5);
+            }
+        }
+    }
+    
+    ctx.restore();
+  };
+
+  const drawUSBeamProfile = (ctx: CanvasRenderingContext2D, d: Uint8Array, W: number, H: number, theme: ThemeColors, pulse: number, s: VisualizerSettings) => {
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
+    ctx.fillRect(0, 0, W, H);
+
+    ctx.save();
+    ctx.globalCompositeOperation = 'screen';
+
+    const cx = W / 2;
+    // Generate an hourglass shape (Beam Profile)
+    // Near field (Fresnel zone), Focal point, Far field (Fraunhofer zone)
+    
+    const focalDepth = Math.max(H * 0.3, Math.min(H * 0.7, H * 0.5 + Math.sin(Date.now()*0.002) * 100)); // Dynamic focal depth
+    const nearFieldWidth = 100;
+    const focalWidth = 10;
+    const farFieldWidth = 200;
+    
+    const steps = 100;
+    
+    for (let j = 0; j < 3; j++) { // 3 simultaneous beams for array
+      const offsetX = (j - 1) * 120;
+      
+      // Draw beam outline
+      ctx.beginPath();
+      for(let i = 0; i <= steps; i++) {
+          const y = (i / steps) * H;
+          let beamRadius;
+          if (y < focalDepth) {
+              const t = y / focalDepth;
+              beamRadius = nearFieldWidth * (1 - t) + focalWidth * t;
+          } else {
+              const t = (y - focalDepth) / (H - focalDepth);
+              beamRadius = focalWidth * (1 - t) + farFieldWidth * t;
+          }
+          
+          if (i === 0) ctx.moveTo(cx + offsetX - beamRadius, y);
+          else ctx.lineTo(cx + offsetX - beamRadius, y);
+      }
+      for(let i = steps; i >= 0; i--) {
+          const y = (i / steps) * H;
+          let beamRadius;
+          if (y < focalDepth) {
+              const t = y / focalDepth;
+              beamRadius = nearFieldWidth * (1 - t) + focalWidth * t;
+          } else {
+              const t = (y - focalDepth) / (H - focalDepth);
+              beamRadius = focalWidth * (1 - t) + farFieldWidth * t;
+          }
+          ctx.lineTo(cx + offsetX + beamRadius, y);
+      }
+      ctx.closePath();
+      
+      const val = (d[Math.floor((j / 3) * 50)] || 0) / 255;
+      
+      // Fill beam with gradient
+      const grad = ctx.createLinearGradient(0, 0, 0, H);
+      grad.addColorStop(0, `rgba(100, 200, 255, ${0.1 + val*0.2})`); // Transducer surface
+      grad.addColorStop(focalDepth / H, `rgba(255, 255, 255, ${0.3 + val*0.6 + pulse*0.2})`); // Focal zone is brightest
+      grad.addColorStop(1, `rgba(100, 200, 255, ${0.05})`); // Far field is dim
+      
+      ctx.fillStyle = grad;
+      ctx.fill();
+      
+      ctx.strokeStyle = `rgba(201, 168, 76, ${0.2 + val*0.5})`;
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      
+      // Draw wave fronts
+      const waveCount = 20;
+      for (let k = 0; k < waveCount; k++) {
+          const t = ((Date.now() * 0.001 * s.speed + k / waveCount) % 1);
+          const y = t * H;
+          
+          let beamRadius;
+          if (y < focalDepth) {
+              const tt = y / focalDepth;
+              beamRadius = nearFieldWidth * (1 - tt) + focalWidth * tt;
+          } else {
+              const tt = (y - focalDepth) / (H - focalDepth);
+              beamRadius = focalWidth * (1 - tt) + farFieldWidth * tt;
+          }
+          
+          ctx.beginPath();
+          // Curvature of wavefront changes (planar -> converging -> planar -> diverging)
+          const curvature = (focalDepth - y) / focalDepth * 20;
+          ctx.moveTo(cx + offsetX - beamRadius, y - curvature);
+          ctx.quadraticCurveTo(cx + offsetX, y + curvature, cx + offsetX + beamRadius, y - curvature);
+          
+          ctx.strokeStyle = `rgba(255, 255, 255, ${Math.sin(t * Math.PI) * (0.1 + val * 0.5)})`;
+          ctx.stroke();
+      }
+    }
+    
+    ctx.restore();
+  };
+
+  const drawUSAttenuation = (ctx: CanvasRenderingContext2D, d: Uint8Array, W: number, H: number, theme: ThemeColors, pulse: number, s: VisualizerSettings) => {
+    ctx.fillStyle = 'rgba(5, 5, 5, 0.2)';
+    ctx.fillRect(0, 0, W, H);
+    
+    ctx.save();
+    ctx.globalCompositeOperation = 'screen';
+
+    // Different tissues cause different attenuation rates
+    // Simulating multiple beams penetrating tissue
+    const beams = 100;
+    const rectW = W / beams;
+    
+    const time = Date.now() * 0.001 * s.speed;
+    
+    for (let i = 0; i < beams; i++) {
+        const val = ((d[Math.floor((i / beams) * d.length)] || 0) / 255);
+        
+        let startAmplitude = 1.0 + (pulse * 0.5) + val;
+        
+        const obstacleDepth1 = 0.3 * H + Math.sin(i * 0.1) * 50;
+        const obstacleDepth2 = 0.7 * H + Math.cos(i * 0.05 + time) * 80;
+        
+        const isShadowing = Math.sin(i * 0.2 + time) > 0.8;
+        const isEnhancement = Math.cos(i * 0.15) > 0.8;
+        
+        const grad = ctx.createLinearGradient(0, 0, 0, H);
+        
+        let currentAmp = startAmplitude;
+        
+        // Depth 0
+        grad.addColorStop(0, `rgba(255, 255, 255, ${currentAmp * 0.5 * s.intensity})`);
+        
+        // Top to Obstacle 1
+        currentAmp *= Math.exp(-0.5); // standard tissue attenuation
+        grad.addColorStop(obstacleDepth1 / H, `rgba(200, 200, 200, ${currentAmp * 0.5 * s.intensity})`);
+        
+        if (isShadowing) {
+            // Calcification/Bone causes heavy shadow
+            grad.addColorStop((obstacleDepth1 + 10) / H, `rgba(255, 100, 100, ${currentAmp * 0.8})`); 
+            currentAmp *= 0.1; // Sudden drop
+        } else if (isEnhancement) {
+            // Fluid causes enhancement
+            grad.addColorStop((obstacleDepth1 + 10) / H, `rgba(100, 150, 255, ${currentAmp * 0.2})`); 
+        } else {
+            currentAmp *= Math.exp(-0.2); 
+        }
+        
+        grad.addColorStop((obstacleDepth1 + 20) / H, `rgba(150, 150, 150, ${currentAmp * 0.5 * s.intensity})`);
+        
+        // Obstacle 1 to Obstacle 2
+        grad.addColorStop(obstacleDepth2 / H, `rgba(100, 100, 100, ${currentAmp * 0.3 * s.intensity})`);
+        
+        if (isEnhancement) {
+            currentAmp *= 2.0; 
+        }
+        
+        currentAmp *= Math.exp(-0.8);
+        
+        // End
+        grad.addColorStop(1, `rgba(50, 50, 50, ${currentAmp * 0.1 * s.intensity})`);
+        
+        ctx.fillStyle = grad;
+        ctx.fillRect(i * rectW, 0, rectW - 1, H);
+        
+        // Plot attenuation curve (TGC - Time Gain Compensation curve equivalent)
+        if (i % 20 === 0) {
+            ctx.beginPath();
+            ctx.moveTo(i * rectW, 0);
+            ctx.quadraticCurveTo(i * rectW + 50 * startAmplitude, H / 2, i * rectW + 20 * currentAmp, H);
+            ctx.strokeStyle = `rgba(201, 168, 76, 0.4)`;
+            ctx.stroke();
+        }
+    }
+    
+    ctx.restore();
+  };
+
+  const drawDoppler = (ctx: CanvasRenderingContext2D, d: Uint8Array, timeData: Uint8Array, W: number, H: number, theme: ThemeColors, pulse: number, s: VisualizerSettings) => {
+    // Cinematic spectral background
+    ctx.fillStyle = 'rgba(5, 5, 8, 0.5)';
+    ctx.fillRect(0, 0, W, H);
+    
+    const maxHistory = Math.floor(W / 3); // 3 pixels per slice
+    const currentSlice = new Uint8Array(d);
+    
+    dopplerHistory.current.push(currentSlice as any);
+    if (dopplerHistory.current.length > maxHistory) {
+      dopplerHistory.current.shift();
+    }
+    
+    ctx.save();
+    ctx.globalCompositeOperation = 'screen';
+    const centerY = H / 2;
+    
+    // Draw Baseline
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+    ctx.setLineDash([5, 5]);
+    ctx.beginPath();
+    ctx.moveTo(0, centerY);
+    ctx.lineTo(W, centerY);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    
+    const sliceWidth = W / maxHistory;
+    const bins = Math.floor(d.length / 2); // Total bins to plot
+    
+    for (let hIndex = 0; hIndex < dopplerHistory.current.length; hIndex++) {
+        const freqs = dopplerHistory.current[hIndex] as any as Uint8Array;
+        const x = hIndex * sliceWidth;
+        
+        for (let i = 0; i < bins; i++) {
+            const val = (freqs[i] / 255.0) * s.intensity;
+            
+            if (val > 0.05) {
+                // Red/Blue Shift Logic based on frequency bands
+                // Lower frequency -> Red (Towards)
+                // Higher frequency -> Blue (Away)
+                
+                const isTowards = i < (bins / 2); // Split at midpoint
+                
+                // Map the sub-index to distance from baseline
+                // For towards (0 to bins/2), 0 is fastest (peak red), bins/2 is slowest
+                // For away (bins/2 to bins), bins is fastest (peak blue), bins/2 is slowest
+                
+                let y;
+                let color;
+                
+                if (isTowards) {
+                    const velocity = 1.0 - (i / (bins / 2)); // 1.0 to 0.0
+                    y = centerY - (velocity * H * 0.45);
+                    color = `rgba(255, ${Math.floor(100 * velocity)}, 0, ${val})`;
+                } else {
+                    const velocity = (i - bins / 2) / (bins / 2); // 0.0 to 1.0
+                    y = centerY + (velocity * H * 0.45);
+                    color = `rgba(0, ${Math.floor(150 * velocity)}, 255, ${val})`;
+                }
+                
+                // Draw Spectral trace dot
+                ctx.fillStyle = color;
+                ctx.fillRect(x, y - 1, sliceWidth + 0.5, 3);
+                
+                // Spectral Broadening effect (fill down/up to baseline)
+                if (val > 0.3) {
+                     const fillHeight = Math.abs(y - centerY);
+                     const startY = Math.min(y, centerY);
+                     const grad = ctx.createLinearGradient(x, centerY, x, y);
+                     grad.addColorStop(0, `rgba(${isTowards?'255,50,0':'0,100,255'},0)`);
+                     grad.addColorStop(1, color);
+                     ctx.fillStyle = grad;
+                     ctx.fillRect(x, startY, sliceWidth + 0.5, fillHeight);
+                }
+            }
+        }
+    }
+    
+    // Draw leading edge scanner light
+    const leadingX = dopplerHistory.current.length * sliceWidth;
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+    ctx.fillRect(leadingX, 0, 1, H);
+    
+    // Sweep glow
+    const sweepGrad = ctx.createLinearGradient(leadingX - 20, 0, leadingX, 0);
+    sweepGrad.addColorStop(0, 'rgba(0,0,0,0)');
+    sweepGrad.addColorStop(1, 'rgba(201, 168, 76, 0.4)');
+    ctx.fillStyle = sweepGrad;
+    ctx.fillRect(leadingX - 20, 0, 20, H);
+    
+    // Overlay Text
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+    ctx.font = 'bold 10px monospace';
+    ctx.fillText('+ BASS / TOWARDS (RED SHIFT)', 10, 20);
+    ctx.fillText('- TREBLE / AWAY (BLUE SHIFT)', 10, H - 10);
+    ctx.fillStyle = 'rgba(201, 168, 76, 0.8)';
+    ctx.fillText('BASELINE 0 cm/s', 10, centerY - 5);
+    
     ctx.restore();
   };
 

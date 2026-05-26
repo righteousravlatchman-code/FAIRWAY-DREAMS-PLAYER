@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'motion/react';
-import { Play, Pause, SkipBack, SkipForward, Volume2, Maximize2, ExternalLink, Heart, Sparkles, Save, Trash2, AlertCircle, Share2, Radio, Settings, Sliders, Palette, ChevronDown, Image as ImageIcon } from 'lucide-react';
+import { Play, Pause, SkipBack, SkipForward, Volume2, Maximize2, ExternalLink, Heart, Sparkles, Save, Trash2, AlertCircle, Share2, Radio, Settings, Sliders, Palette, ChevronDown, Image as ImageIcon, Shuffle, Repeat, Repeat1 } from 'lucide-react';
 import { AnimatePresence } from 'motion/react';
 import { Track, VisualizerMode, ThemeColors, VisualizerSettings, Playlist } from '../types';
 import { Visualizer } from './Visualizer';
@@ -18,6 +18,10 @@ interface PlayerProps {
   theme: ThemeColors;
   themeName: string;
   isFavorite: boolean;
+  isShuffle?: boolean;
+  repeatMode?: 'none' | 'all' | 'one';
+  onToggleShuffle?: () => void;
+  onToggleRepeat?: () => void;
   onTogglePlay: () => void;
   onPrev: () => void;
   onNext: () => void;
@@ -48,6 +52,10 @@ export const Player: React.FC<PlayerProps> = ({
   theme,
   themeName,
   isFavorite,
+  isShuffle,
+  repeatMode,
+  onToggleShuffle,
+  onToggleRepeat,
   onTogglePlay,
   onPrev,
   onNext,
@@ -70,6 +78,36 @@ export const Player: React.FC<PlayerProps> = ({
   const [showSharePicker, setShowSharePicker] = React.useState(false);
   const [showPlaylistPicker, setShowPlaylistPicker] = React.useState(false);
   const [isFullscreen, setIsFullscreen] = React.useState(false);
+
+  const handleDragSeek = (e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>) => {
+    const el = e.currentTarget;
+    const updateSeek = (clientX: number) => {
+      const rect = el.getBoundingClientRect();
+      let pct = (clientX - rect.left) / rect.width;
+      pct = Math.max(0, Math.min(1, pct));
+      onSeek(pct * duration);
+    };
+
+    const handleMouseMove = (moveEvent: MouseEvent | TouchEvent) => {
+      const clientX = 'touches' in moveEvent ? moveEvent.touches[0].clientX : (moveEvent as MouseEvent).clientX;
+      updateSeek(clientX);
+    };
+
+    const handleMouseUp = () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('touchmove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.removeEventListener('touchend', handleMouseUp);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('touchmove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    document.addEventListener('touchend', handleMouseUp);
+
+    const clientX = 'touches' in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
+    updateSeek(clientX);
+  };
 
   const imageRef1 = React.useRef<HTMLImageElement>(null);
   const imageRef2 = React.useRef<HTMLImageElement>(null);
@@ -147,7 +185,7 @@ export const Player: React.FC<PlayerProps> = ({
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="relative rounded-[2.5rem] overflow-hidden border border-white/10 shadow-[0_0_50px_-12px_rgba(201,168,76,0.15)] surface-panel bg-black/60 backdrop-blur-3xl"
+        className="relative rounded-[2.5rem] overflow-hidden border border-white/10 shadow-[0_0_50px_-12px_rgba(201,168,76,0.15)] surface-panel bg-black/60 backdrop-blur-3xl hover:scale-[1.01] hover:shadow-[0_0_40px_rgba(201,168,76,0.3)] transition-all duration-300"
       >
         <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent pointer-events-none" />
         
@@ -168,27 +206,22 @@ export const Player: React.FC<PlayerProps> = ({
                 initial={{ opacity: 0, scale: 0.8 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.8 }}
-                className="absolute inset-0 flex items-center justify-center pointer-events-none mix-blend-screen"
+                className="absolute inset-0 flex items-center justify-center pointer-events-none"
               >
-                <motion.div
-                  animate={{ 
-                    scale: isPlaying ? [1, 1.05, 1] : 1,
-                    rotate: isPlaying ? [0, 360] : 0
-                  }}
-                  transition={{ 
-                    scale: { duration: 2, repeat: Infinity, ease: "easeInOut" },
-                    rotate: { duration: 40, repeat: Infinity, ease: "linear" }
-                  }}
-                  className="relative w-32 h-32 md:w-48 md:h-48"
-                >
-                  <div className="absolute inset-0 rounded-full border border-gold/30 border-dashed animate-pulse" />
+                <div className="relative w-28 h-28 md:w-40 md:h-40 flex items-center justify-center">
+                  <motion.div
+                    animate={{ scale: isPlaying ? [1, 1.05, 1] : 1 }}
+                    transition={{ scale: { duration: 2, repeat: Infinity, ease: "easeInOut" } }}
+                    className="absolute inset-0 rounded-full border border-gold/30 border-dashed animate-pulse ring-4 ring-gold/10"
+                  />
                   <img 
+                    ref={imageRef1}
                     src={currentTrack.art || '/src/assets/images/default_cover_1779345608057.png'} 
                     alt={currentTrack.title}
-                    className="w-full h-full rounded-full object-cover opacity-70 border border-white/10"
+                    className="w-full h-full rounded-full border-2 border-gold object-cover shadow-[0_0_30px_rgba(201,168,76,0.3)] relative z-10 transition-transform duration-75"
                     referrerPolicy="no-referrer"
                   />
-                </motion.div>
+                </div>
               </motion.div>
             )}
           </AnimatePresence>
@@ -290,6 +323,17 @@ export const Player: React.FC<PlayerProps> = ({
                          <div className={`absolute top-0.5 left-0.5 w-3 h-3 rounded-full bg-white transition-transform ${settings.showCenterImage ? 'translate-x-4' : 'translate-x-0'}`} />
                       </button>
                     </div>
+                  </div>
+
+                  <div className="pt-2 border-t border-white/10 mt-4">
+                    <button 
+                      onClick={() => {
+                        showToast("Settings preset saved to your profile!", "success");
+                      }}
+                      className="w-full flex items-center justify-center gap-2 py-2 bg-gold/20 hover:bg-gold/30 text-gold rounded-lg transition-colors text-[9px] uppercase tracking-widest font-bold"
+                    >
+                      <Save size={12} /> Save Preset
+                    </button>
                   </div>
 
                 </div>
@@ -477,13 +521,10 @@ export const Player: React.FC<PlayerProps> = ({
           {/* Progress Bar */}
           <div 
             className="absolute bottom-0 left-0 right-0 h-2 md:h-1 bg-white/5 cursor-pointer group/progress overflow-hidden"
-            onClick={(e) => {
-              const rect = e.currentTarget.getBoundingClientRect();
-              const pct = (e.clientX - rect.left) / rect.width;
-              onSeek(pct * duration);
-            }}
+            onMouseDown={handleDragSeek}
+            onTouchStart={handleDragSeek}
           >
-            <div className="absolute inset-0 flex gap-0.5 items-end opacity-20">
+            <div className="absolute inset-0 flex gap-0.5 items-end opacity-20 pointer-events-none">
               {Array.from({ length: 100 }).map((_, i) => (
                 <motion.div
                   key={i}
@@ -515,7 +556,7 @@ export const Player: React.FC<PlayerProps> = ({
                     onChange={(e) => updateSetting('mode', e.target.value as VisualizerMode)}
                     className="appearance-none bg-white/5 hover:bg-white/10 border border-white/10 text-gold text-[10px] uppercase tracking-wider rounded-full px-4 py-1.5 md:py-1.5 pr-8 outline-none focus:border-gold/50 cursor-pointer transition-all"
                   >
-                    {(['bars', 'wave', 'radial', 'particles', 'mirror', 'scope', 'tunnel', 'nebula', 'vortex', 'matrix', 'kaleidoscope', 'liquid', 'dna', 'galaxy', 'atom', 'blackhole', 'constellation', 'cymatics', 'sacred-geometry', 'hologram'] as VisualizerMode[]).map((m) => (
+                    {(['bars', 'wave', 'radial', 'particles', 'mirror', 'scope', 'tunnel', 'nebula', 'vortex', 'matrix', 'kaleidoscope', 'liquid', 'dna', 'galaxy', 'atom', 'blackhole', 'constellation', 'cymatics', 'sacred-geometry', 'hologram', 'us-pulse-echo', 'us-color-doppler', 'us-beam-profile', 'us-attenuation', 'doppler'] as VisualizerMode[]).map((m) => (
                       <option key={m} value={m} className="bg-black text-white">{m}</option>
                     ))}
                   </select>
@@ -558,25 +599,25 @@ export const Player: React.FC<PlayerProps> = ({
             </div>
 
             {/* Center: Playback */}
-            <div className="flex items-center justify-center gap-8 md:gap-6 order-first md:order-none py-2 md:py-0">
+            <div className="flex items-center justify-center gap-6 md:gap-4 order-first md:order-none py-2 md:py-0 w-full md:w-auto">
+              {onToggleShuffle && (
+                <button 
+                  onClick={onToggleShuffle} 
+                  className={`hidden sm:block p-2 transition-all active:scale-90 ${isShuffle ? 'text-gold drop-shadow-[0_0_8px_rgba(201,168,76,0.5)]' : 'text-[var(--text-secondary)] hover:text-white'}`}
+                  title="Shuffle"
+                >
+                  <Shuffle size={18} />
+                </button>
+              )}
+              
               <button 
                 onClick={onPrev} 
                 className="text-[var(--text-secondary)] hover:text-gold transition-all active:scale-90 relative group/prev"
               >
                 <SkipBack size={32} fill="currentColor" className="w-8 h-8 md:w-7 md:h-7" />
-                <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 flex gap-0.5 h-1 items-end opacity-0 group-hover/prev:opacity-50 transition-opacity">
-                  {[1, 2].map(i => (
-                    <motion.div
-                      key={i}
-                      animate={{ height: [1, 4, 2] }}
-                      transition={{ duration: 1, repeat: Infinity, delay: i * 0.1 }}
-                      className="w-0.5 bg-gold rounded-full"
-                    />
-                  ))}
-                </div>
               </button>
               
-              <div className="relative">
+              <div className="relative mx-2">
                 <AnimatePresence>
                   {error && (
                     <motion.div
@@ -633,17 +674,17 @@ export const Player: React.FC<PlayerProps> = ({
                 className="text-[var(--text-secondary)] hover:text-gold transition-all active:scale-90 relative group/next"
               >
                 <SkipForward size={32} fill="currentColor" className="w-8 h-8 md:w-7 md:h-7" />
-                <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 flex gap-0.5 h-1 items-end opacity-0 group-hover/next:opacity-50 transition-opacity">
-                  {[1, 2].map(i => (
-                    <motion.div
-                      key={i}
-                      animate={{ height: [1, 4, 2] }}
-                      transition={{ duration: 1, repeat: Infinity, delay: i * 0.1 }}
-                      className="w-0.5 bg-gold rounded-full"
-                    />
-                  ))}
-                </div>
               </button>
+              
+              {onToggleRepeat && (
+                <button 
+                  onClick={onToggleRepeat} 
+                  className={`hidden sm:block p-2 transition-all active:scale-90 ${repeatMode !== 'none' ? 'text-gold drop-shadow-[0_0_8px_rgba(201,168,76,0.5)]' : 'text-[var(--text-secondary)] hover:text-white'}`}
+                  title={repeatMode === 'one' ? "Repeat One" : "Repeat All"}
+                >
+                  {repeatMode === 'one' ? <Repeat1 size={18} /> : <Repeat size={18} />}
+                </button>
+              )}
             </div>
 
             {/* Right: Volume & Link */}
@@ -796,27 +837,22 @@ export const Player: React.FC<PlayerProps> = ({
                     initial={{ opacity: 0, scale: 0.8 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.8 }}
-                    className="absolute inset-0 flex items-center justify-center pointer-events-none mix-blend-screen"
+                    className="absolute inset-0 flex items-center justify-center pointer-events-none"
                   >
-                    <motion.div
-                      animate={{ 
-                        scale: isPlaying ? [1, 1.05, 1] : 1,
-                        rotate: isPlaying ? [0, 360] : 0
-                      }}
-                      transition={{ 
-                        scale: { duration: 2, repeat: Infinity, ease: "easeInOut" },
-                        rotate: { duration: 40, repeat: Infinity, ease: "linear" }
-                      }}
-                      className="relative w-48 h-48 md:w-80 md:h-80"
-                    >
-                      <div className="absolute inset-0 rounded-full border border-gold/30 border-dashed animate-pulse" />
+                    <div className="relative w-48 h-48 md:w-72 md:h-72 flex items-center justify-center">
+                      <motion.div
+                        animate={{ scale: isPlaying ? [1, 1.05, 1] : 1 }}
+                        transition={{ scale: { duration: 4, repeat: Infinity, ease: "easeInOut" } }}
+                        className="absolute inset-0 rounded-full border border-gold/20 border-dashed animate-pulse opacity-50 ring-4 ring-gold/5"
+                      />
                       <img 
+                        ref={imageRef2}
                         src={currentTrack.art || '/src/assets/images/default_cover_1779345608057.png'} 
                         alt={currentTrack.title}
-                        className="w-full h-full rounded-full object-cover opacity-70 border border-white/10"
+                        className="w-full h-full rounded-full border-4 border-gold/50 object-cover shadow-[0_0_50px_rgba(201,168,76,0.5)] relative z-10 transition-transform duration-75"
                         referrerPolicy="no-referrer"
                       />
-                    </motion.div>
+                    </div>
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -842,14 +878,23 @@ export const Player: React.FC<PlayerProps> = ({
             {/* Bottom Controls */}
             <div className="mt-auto relative z-10 p-8 bg-gradient-to-t from-black/80 to-transparent">
               <div className="max-w-4xl mx-auto space-y-6">
-                <div className="flex items-center justify-center gap-12">
-                  <button onClick={onPrev} className="text-white/60 hover:text-gold transition-colors">
+                <div className="flex items-center justify-center gap-10 md:gap-12">
+                  {onToggleShuffle && (
+                    <button 
+                      onClick={onToggleShuffle} 
+                      className={`p-2 transition-colors active:scale-90 ${isShuffle ? 'text-gold' : 'text-white/60 hover:text-white'}`}
+                    >
+                      <Shuffle size={20} />
+                    </button>
+                  )}
+                  
+                  <button onClick={onPrev} className="text-white/60 hover:text-gold transition-colors active:scale-90">
                     <SkipBack size={32} fill="currentColor" />
                   </button>
                   <button 
                     onClick={onTogglePlay}
                     disabled={isLoading}
-                    className="w-20 h-20 rounded-full gold-gradient flex items-center justify-center text-black shadow-2xl relative group"
+                    className="w-20 h-20 rounded-full gold-gradient flex items-center justify-center text-black shadow-2xl relative group active:scale-95 transition-transform"
                   >
                     {isLoading ? (
                       <motion.div
@@ -863,26 +908,31 @@ export const Player: React.FC<PlayerProps> = ({
                       <Play size={40} fill="currentColor" className="ml-1" />
                     )}
                   </button>
-                  <button onClick={onNext} className="text-white/60 hover:text-gold transition-colors">
+                  <button onClick={onNext} className="text-white/60 hover:text-gold transition-colors active:scale-90">
                     <SkipForward size={32} fill="currentColor" />
                   </button>
+
+                  {onToggleRepeat && (
+                    <button 
+                      onClick={onToggleRepeat} 
+                      className={`p-2 transition-colors active:scale-90 ${repeatMode !== 'none' ? 'text-gold' : 'text-white/60 hover:text-white'}`}
+                    >
+                      {repeatMode === 'one' ? <Repeat1 size={20} /> : <Repeat size={20} />}
+                    </button>
+                  )}
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-2 relative" onMouseDown={handleDragSeek} onTouchStart={handleDragSeek}>
+                  <div className="absolute inset-0 -top-4 -bottom-4 z-20 cursor-pointer" />
                   <div 
-                    className="h-1.5 bg-white/10 rounded-full cursor-pointer overflow-hidden"
-                    onClick={(e) => {
-                      const rect = e.currentTarget.getBoundingClientRect();
-                      const pct = (e.clientX - rect.left) / rect.width;
-                      onSeek(pct * duration);
-                    }}
+                    className="h-1.5 bg-white/10 rounded-full overflow-hidden relative z-10 pointer-events-none"
                   >
                     <div 
                       className="h-full gold-gradient shadow-[0_0_20px_rgba(201,168,76,0.8)]"
                       style={{ width: `${(currentTime / duration) * 100}%` }}
                     />
                   </div>
-                  <div className="flex justify-between text-[10px] font-mono text-white/40 tracking-widest">
+                  <div className="flex justify-between text-[10px] font-mono text-white/40 tracking-widest pointer-events-none">
                     <span>{formatTime(currentTime)}</span>
                     <span>{formatTime(duration)}</span>
                   </div>

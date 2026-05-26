@@ -39,6 +39,7 @@ export const AdminDashboard: React.FC = () => {
   const [batchImageUrl, setBatchImageUrl] = useState('');
   const [isMigrating, setIsMigrating] = useState(false);
   const [isConfirmingBulkDelete, setIsConfirmingBulkDelete] = useState(false);
+  const [adminTab, setAdminTab] = useState<'system' | 'media' | 'playlists' | 'store' | 'crm' | 'users' | 'moderation'>('system');
   
   const addLog = (msg: string, type: 'info' | 'success' | 'error' = 'info') => {
     const timestamp = new Date().toLocaleTimeString();
@@ -956,9 +957,35 @@ export const AdminDashboard: React.FC = () => {
         </div>
       </div>
 
+      <div className="flex gap-4 mb-8 overflow-x-auto pb-2 custom-scrollbar">
+        {[
+          { id: 'system', label: 'System Config' },
+          { id: 'media', label: 'Media Library' },
+          { id: 'playlists', label: 'Playlists' },
+          { id: 'store', label: 'Merch Store' },
+          { id: 'crm', label: 'CRM' },
+          { id: 'users', label: 'Users' },
+          { id: 'moderation', label: 'Moderation' }
+        ].map(tab => (
+           <button 
+             key={tab.id}
+             onClick={() => {
+               const el = document.getElementById(`section-${tab.id}`);
+               if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+               if (tab.id === 'playlists') {
+                  setShowPlaylistForm(true); // Auto-open the form if they click it!
+               }
+             }}
+             className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-[10px] uppercase tracking-widest font-bold whitespace-nowrap hover:bg-gold hover:text-black hover:border-gold transition-colors text-white"
+           >
+             {tab.label}
+           </button>
+        ))}
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* System Configuration */}
-        <section className="surface-panel rounded-3xl p-6 lg:col-span-2">
+        <section id="section-system" className="surface-panel rounded-3xl p-6 lg:col-span-2">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
               <Megaphone className="text-gold" size={20} />
@@ -1012,7 +1039,7 @@ export const AdminDashboard: React.FC = () => {
         </section>
 
         {/* Media Library Management */}
-        <section className="surface-panel rounded-3xl p-6 lg:col-span-2">
+        <section id="section-media" className="surface-panel rounded-3xl p-6 lg:col-span-2">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
               <Music className="text-gold" size={20} />
@@ -1627,7 +1654,7 @@ export const AdminDashboard: React.FC = () => {
         </section>
 
         {/* Playlist Management */}
-        <section className="surface-panel rounded-3xl p-6 lg:col-span-2">
+        <section id="section-playlists" className="surface-panel rounded-3xl p-6 lg:col-span-2">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
               <BarChart3 className="text-gold" size={20} />
@@ -1813,7 +1840,7 @@ export const AdminDashboard: React.FC = () => {
         </section>
 
         {/* Merch Store Management */}
-        <section className="surface-panel rounded-3xl p-6 lg:col-span-2">
+        <section id="section-store" className="surface-panel rounded-3xl p-6 lg:col-span-2">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
               <ShoppingBag className="text-gold" size={20} />
@@ -1986,7 +2013,7 @@ export const AdminDashboard: React.FC = () => {
         </section>
 
         {/* CRM Overview */}
-        <section className="surface-panel rounded-3xl p-6">
+        <section id="section-crm" className="surface-panel rounded-3xl p-6">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
               <Users className="text-gold" size={20} />
@@ -2038,7 +2065,7 @@ export const AdminDashboard: React.FC = () => {
         </section>
 
         {/* User Management */}
-        <section className="surface-panel rounded-3xl p-6">
+        <section id="section-users" className="surface-panel rounded-3xl p-6">
           <div className="flex items-center gap-3 mb-6">
             <Users className="text-gold" size={20} />
             <h2 className="text-xl font-display text-[var(--text-primary)]">User Directory</h2>
@@ -2072,7 +2099,7 @@ export const AdminDashboard: React.FC = () => {
         </section>
 
         {/* Content Moderation */}
-        <section className="surface-panel rounded-3xl p-6">
+        <section id="section-moderation" className="surface-panel rounded-3xl p-6">
           <div className="flex items-center gap-3 mb-6">
             <MessageSquare className="text-gold" size={20} />
             <h2 className="text-xl font-display text-[var(--text-primary)]">Community Moderation</h2>

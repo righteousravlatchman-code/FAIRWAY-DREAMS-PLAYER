@@ -7,6 +7,65 @@ export interface FrequencyReportData {
   birthDate: string;
 }
 
+export async function generateTraditionInsight(name: string, birthDate: string, tradition: string, data: any) {
+  const model = "gemini-3.1-pro-preview";
+  const prompt = `
+    You are the central intelligence for Fairway Dreams.
+    Analyze the following ${tradition} astrology data for ${name} (Born: ${birthDate}).
+    Provide a deeply insightful, cinematic, and strategic read of what this specific celestial matrix element means for their identity, career leverage, and vibrational rhythm.
+    
+    Data:
+    ${JSON.stringify(data, null, 2)}
+    
+    Format the response in clean, beautiful Markdown with clear headings and bullet points. Use a professional, mystical, and strategic tone that feels like a "Mission Control" briefing for their life. Keep it highly focused on actionable insight and deep psychological resonance. Max 250 words.
+  `;
+
+  try {
+    const response = await ai.models.generateContent({
+      model,
+      contents: [{ parts: [{ text: prompt }] }],
+      config: {
+        temperature: 0.8,
+      }
+    });
+
+    return response.text || "";
+  } catch (error) {
+    console.error("Error generating tradition insight:", error);
+    throw error;
+  }
+}
+
+export async function generateMissionControlInsight(name: string, birthDate: string, element: string, data: any) {
+  const model = "gemini-3.1-pro-preview";
+  const prompt = `
+    You are the central intelligence for Fairway Dreams.
+    Analyze the following ${element} data for ${name} (Born: ${birthDate}) within the context of their "Mission Control" numerological systems.
+    Provide a deeply insightful, cinematic, and strategic read of what this specific element means for their identity, career leverage, and vibrational rhythm.
+    
+    Element: ${element}
+    Data:
+    ${JSON.stringify(data, null, 2)}
+    
+    Format the response in clean, beautiful Markdown with clear headings and bullet points. Use a professional, mystical, and strategic tone that feels like a "Mission Control" briefing for their life. Keep it highly focused on actionable insight and deep psychological resonance. Max 250 words.
+  `;
+
+  try {
+    const response = await ai.models.generateContent({
+      model,
+      contents: [{ parts: [{ text: prompt }] }],
+      config: {
+        temperature: 0.8,
+      }
+    });
+
+    return response.text || "";
+  } catch (error) {
+    console.error("Error generating mission control insight:", error);
+    throw error;
+  }
+}
+
 export async function generateFrequencyReport(data: FrequencyReportData) {
   const cacheKey = `gemini_freq_${data.name.replace(/\s+/g, '_')}_${data.birthDate}_${new Date().toLocaleDateString()}`;
   const cached = localStorage.getItem(cacheKey);

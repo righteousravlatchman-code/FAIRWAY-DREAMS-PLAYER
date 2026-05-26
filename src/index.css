@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@plugin "@tailwindcss/typography";
 
 :root {
   --bg-color: #050505;
@@ -23,11 +24,11 @@
   --header-bg: #000000; /* Black Header */
   --footer-bg: #000000; /* Black Footer */
   --text-primary: #000000; /* Black */
-  --text-secondary: #000000; /* Pure black */
+  --text-secondary: #4a4a4a; /* Dark gray for hierarchy */
   --panel-bg: rgba(255, 255, 255, 0.7);
   --panel-border: rgba(0, 0, 0, 0.1);
   --surface: #ffffff;
-  --gold: #000000; 
+  --gold: #aa8024; /* Keep a gold shade instead of pure black */
   --shadow: 0 10px 40px -12px rgba(0, 0, 0, 0.1);
 }
 
@@ -93,12 +94,6 @@
 .light .bg-[#050505].text-white,
 .light .bg-[#0a0a0a] .text-white,
 .light .bg-[#0a0a0a].text-white,
-.light .bg-zinc-950 .text-white,
-.light .bg-zinc-950.text-white,
-.light .bg-zinc-900 .text-white,
-.light .bg-zinc-900.text-white,
-.light .bg-zinc-800 .text-white,
-.light .bg-zinc-800.text-white,
 .light .gold-gradient .text-white,
 .light .gold-gradient.text-white,
 .light .bg-gold .text-white,
@@ -195,19 +190,19 @@
 
   /* Mobile-first font size scaling */
   .text-responsive-h1 {
-    @apply text-3xl sm:text-4xl md:text-6xl lg:text-8xl;
+    @apply text-4xl sm:text-5xl md:text-7xl lg:text-9xl;
   }
   
   .text-responsive-h2 {
-    @apply text-2xl sm:text-3xl md:text-4xl;
+    @apply text-3xl sm:text-4xl md:text-6xl;
   }
 
   .text-responsive-body {
-    @apply text-sm sm:text-base;
+    @apply text-base sm:text-lg md:text-xl;
   }
 
   .text-responsive-xs {
-    @apply text-[10px] sm:text-xs;
+    @apply text-xs sm:text-sm md:text-base;
   }
 
   /* Mobile-friendly padding and margins */
@@ -253,5 +248,18 @@
     @apply transition-transform duration-300 hover:scale-105;
   }
 }
+
+/* Light Mode Overrides for Hardcoded Tailwind Backgrounds/Borders */
+.light .bg-white\/5 { background-color: rgba(0,0,0,0.05) !important; }
+.light .hover\:bg-white\/10:hover { background-color: rgba(0,0,0,0.1) !important; }
+.light .border-white\/10, .light .border-white\/5 { border-color: rgba(0,0,0,0.1) !important; }
+.light .bg-white\/2 { background-color: rgba(0,0,0,0.02) !important; }
+.light .hover\:bg-white\/5:hover { background-color: rgba(0,0,0,0.05) !important; }
+.light .text-zinc-300, .light .text-zinc-400, .light .text-zinc-500, .light .text-zinc-600 { color: #333333 !important; }
+.light .bg-zinc-900, .light .bg-zinc-800, .light .bg-black\/50, .light .bg-black\/40 { background-color: #f0f0eb !important; border-color: rgba(0,0,0,0.1) !important; }
+.light .bg-black\/60 { background-color: rgba(0,0,0,0.05) !important; color: #000 !important; }
+.light .text-white { color: #000000 !important; }
+.light .hover\:text-white:hover { color: #000000 !important; }
+.light .placeholder\:text-zinc-700::-webkit-input-placeholder { color: #888 !important; }
 
 @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Raleway:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600&display=swap');

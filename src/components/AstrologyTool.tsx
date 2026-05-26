@@ -1,10 +1,12 @@
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Sparkles, RefreshCw, Compass, Moon, TreePine, Sun, Volume2, Pause, Loader2, Gem, Ghost, Book, Calendar, Clock, Mic2, Fingerprint, Eye, Bird, Fish, Feather, Rabbit, Bug, Shield, Flame, Waves, Wind, Skull, Hand, Tent, Map, Grid, Trash2, Zap, Globe, Sparkle, Cat, Mouse, Award, Dog } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import { Sparkles, RefreshCw, Compass, Moon, TreePine, Sun, Volume2, Pause, Loader2, Gem, Ghost, Book, Calendar, Clock, Mic2, Fingerprint, Eye, Bird, Fish, Feather, Rabbit, Bug, Shield, Flame, Waves, Wind, Skull, Hand, Tent, Map, Grid, Trash2, Zap, Globe, Sparkle, Cat, Mouse, Award, Dog, ChevronDown } from 'lucide-react';
 import { VedicAstrology, ArabianAstrology, DruidAstrology, MayanAstrology } from '../services/astrologyService';
 import { useAudioNarrator } from '../hooks/useAudioNarrator';
 import { useToast } from './ToastProvider';
 import { MetalIcon } from './MetalIcon';
+import { generateTraditionInsight } from '../services/geminiService';
 
 interface AstrologyToolProps {
   userData: { name: string; birthDate: string };
@@ -15,7 +17,33 @@ type Tradition = 'vedic' | 'arabian' | 'druid' | 'mayan';
 
 export const AstrologyTool: React.FC<AstrologyToolProps> = ({ userData, onReset }) => {
   const [activeTradition, setActiveTradition] = useState<Tradition>('vedic');
+  const [deepInsights, setDeepInsights] = useState<Record<string, string>>({});
+  const [loadingInsight, setLoadingInsight] = useState(false);
   const { isPlaying, audioLoading, toggleData, setAudioBuffer } = useAudioNarrator();
+  const { showToast } = useToast();
+
+  const handleGenerateDeepInsight = async () => {
+    if (deepInsights[activeTradition]) return;
+    
+    setLoadingInsight(true);
+    try {
+      let dataToAnalyze = null;
+      switch (activeTradition) {
+        case 'vedic': dataToAnalyze = vedicData; break;
+        case 'arabian': dataToAnalyze = arabianData; break;
+        case 'druid': dataToAnalyze = druidData; break;
+        case 'mayan': dataToAnalyze = mayanData; break;
+      }
+        
+      const res = await generateTraditionInsight(userData.name, userData.birthDate, activeTradition, dataToAnalyze);
+      setDeepInsights(prev => ({ ...prev, [activeTradition]: res }));
+      showToast("Deep Celestial Insight Received", "success");
+    } catch (err) {
+      showToast("Failed to divine insight. Matrix interference.", "error");
+    } finally {
+      setLoadingInsight(false);
+    }
+  };
 
   const handleToggleAudio = () => {
     const data: any = {
@@ -463,6 +491,44 @@ export const AstrologyTool: React.FC<AstrologyToolProps> = ({ userData, onReset 
               )}
             </motion.div>
           </AnimatePresence>
+
+          {/* Deep Insight Section */}
+          <div className="mt-8">
+            <div className="p-6 rounded-2xl bg-black/40 border border-gold/20 shadow-[0_0_30px_rgba(201,168,76,0.1)] relative overflow-hidden">
+              <div className="absolute top-0 right-0 p-4 opacity-10">
+                <Sparkles size={64} className="text-gold" />
+              </div>
+              <h4 className="text-gold font-display tracking-widest uppercase mb-4 flex items-center gap-2">
+                <Eye size={16} /> Deep Celestial Insight
+              </h4>
+              
+              {!deepInsights[activeTradition] ? (
+                <div className="text-center py-6 relative z-10">
+                  <p className="text-zinc-400 text-xs mb-6 italic">Query the core intelligence for a multi-dimensional read on your {activeTradition} alignment.</p>
+                  <button 
+                    onClick={handleGenerateDeepInsight}
+                    disabled={loadingInsight}
+                    className="inline-flex items-center gap-2 bg-gold/10 hover:bg-gold/20 text-gold border border-gold/30 px-6 py-3 rounded-xl transition-all uppercase tracking-widest text-[10px] font-bold"
+                  >
+                    {loadingInsight ? (
+                      <><Loader2 size={14} className="animate-spin" /> Divining Matrix...</>
+                    ) : (
+                      <><Sparkles size={14} /> Synthesize {activeTradition} Identity</>
+                    )}
+                  </button>
+                </div>
+              ) : (
+                <motion.div 
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="prose prose-invert prose-gold max-w-none text-sm relative z-10 leading-relaxed"
+                >
+                  <ReactMarkdown>{deepInsights[activeTradition]}</ReactMarkdown>
+                </motion.div>
+              )}
+            </div>
+          </div>
+
         </div>
       </div>
     </div>

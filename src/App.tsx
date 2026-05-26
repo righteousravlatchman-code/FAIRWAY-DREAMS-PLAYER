@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence, useScroll, useTransform } from 'motion/react';
-import { Music, Drone, Info, ShieldCheck, Mail, Menu, X, ChevronRight, Sparkles, Save, LogIn, LogOut, User as UserIcon, Megaphone, Sun, Moon, BookOpen, Shield, Layout, Play, Radio, Users, FileText, HelpCircle, Settings, Compass, Star, ExternalLink, ShoppingBag } from 'lucide-react';
+import { Music, Drone, Info, ShieldCheck, Mail, Menu, X, ChevronRight, Sparkles, Save, LogIn, LogOut, User as UserIcon, Megaphone, Sun, Moon, BookOpen, Shield, Layout, Play, Pause, Radio, Users, FileText, HelpCircle, Settings, Compass, Star, ExternalLink, ShoppingBag } from 'lucide-react';
 import { Track, VisualizerMode, ThemeColors, MediaItem, VisualizerSettings } from './types';
 import { TRACKS, THEMES } from './constants';
 import { useAudioPlayer } from './hooks/useAudioPlayer';
@@ -135,6 +135,8 @@ export default function App() {
   const { riffs, saveRiff, deleteRiff } = useRiffLibrary();
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
+  const [isShuffle, setIsShuffle] = useState(false);
+  const [repeatMode, setRepeatMode] = useState<'none' | 'all' | 'one'>('none');
   const { showToast } = useToast();
 
   // Auth Listener
@@ -687,25 +689,57 @@ Plant conceptual seeds now for action in his next personal year. Present thought
 
   const handlePrev = useCallback(() => {
     if (tracks.length === 0) return;
+    if (currentTime > 3) {
+      seek(0);
+      return;
+    }
+    if (isShuffle) {
+      const remainingTracks = tracks.filter(t => t.id !== currentTrack.id);
+      if (remainingTracks.length === 0) return;
+      const randomTrack = remainingTracks[Math.floor(Math.random() * remainingTracks.length)];
+      handleTrackSelect(randomTrack);
+      return;
+    }
     const currentIndex = tracks.findIndex(t => t.id === currentTrack.id);
     const prevIndex = (currentIndex - 1 + tracks.length) % tracks.length;
     handleTrackSelect(tracks[prevIndex]);
-  }, [currentTrack.id, handleTrackSelect, tracks]);
+  }, [tracks, currentTrack.id, currentTime, seek, isShuffle, handleTrackSelect]);
 
   const handleNext = useCallback(() => {
     if (tracks.length === 0) return;
+    if (isShuffle) {
+      const remainingTracks = tracks.filter(t => t.id !== currentTrack.id);
+      if (remainingTracks.length === 0) return;
+      const randomTrack = remainingTracks[Math.floor(Math.random() * remainingTracks.length)];
+      handleTrackSelect(randomTrack);
+      return;
+    }
     const currentIndex = tracks.findIndex(t => t.id === currentTrack.id);
-    const nextIndex = (currentIndex + 1) % tracks.length;
-    handleTrackSelect(tracks[nextIndex]);
-  }, [currentTrack.id, handleTrackSelect, tracks]);
+    const nextIndex = currentIndex + 1;
+    if (nextIndex >= tracks.length && repeatMode !== 'all') {
+      if (isPlaying) togglePlay();
+      // Alternatively, reset to first song but don't play
+      handleTrackSelect(tracks[0]);
+      if (isPlaying) togglePlay();
+      return;
+    }
+    handleTrackSelect(tracks[nextIndex % tracks.length]);
+  }, [tracks, currentTrack.id, isShuffle, repeatMode, isPlaying, togglePlay, handleTrackSelect]);
 
   useEffect(() => {
     if (!audio) return;
     
-    const onEnded = () => handleNext();
+    const onEnded = () => {
+      if (repeatMode === 'one') {
+        seek(0);
+        audio.play().catch(console.error);
+      } else {
+        handleNext();
+      }
+    };
     audio.addEventListener('ended', onEnded);
     return () => audio.removeEventListener('ended', onEnded);
-  }, [handleNext, audio]);
+  }, [handleNext, audio, repeatMode, seek]);
 
   const generateTrackInsight = async () => {
     if (isGeneratingInsight) return;
@@ -795,9 +829,7 @@ Plant conceptual seeds now for action in his next personal year. Present thought
             onClick={() => setActiveTab('home')}
           >
             <div className="relative">
-              <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl gold-gradient flex items-center justify-center text-black shadow-lg shadow-gold/20 group-hover:scale-110 transition-transform relative z-10">
-                <Drone size={16} />
-              </div>
+              <img src="/logo.png" alt="Fairway Dreams Logo" className="w-8 h-8 md:w-10 md:h-10 object-contain drop-shadow-[0_0_10px_rgba(212,175,55,0.3)] relative z-10" />
               
               <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 flex gap-0.5 h-2 items-end opacity-0 group-hover:opacity-50 transition-opacity">
                 {[1, 2, 3].map(i => (
@@ -1010,17 +1042,17 @@ Plant conceptual seeds now for action in his next personal year. Present thought
               <section className="relative min-h-[85vh] md:min-h-[90vh] flex flex-col items-center justify-center text-center section-padding overflow-hidden">
                 <motion.div 
                   style={{ y: heroY, opacity: heroOpacity }}
-                  className="absolute inset-0 bg-[radial-gradient(circle_at_50%_40%,rgba(201,168,76,0.15),transparent_60%)]" 
+                  className="absolute inset-0 bg-[radial-gradient(circle_at_50%_40%,rgba(201,168,76,0.15),transparent_60%)] pointer-events-none" 
                 />
                 
                 {/* Ambient glowing orbs */}
                 <motion.div 
-                  className="absolute top-[20%] left-[20%] w-64 h-64 bg-gold/10 rounded-full blur-[100px]"
+                  className="absolute top-[20%] left-[20%] w-64 h-64 bg-gold/10 rounded-full blur-[100px] pointer-events-none"
                   animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.6, 0.3] }}
                   transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
                 />
                 <motion.div 
-                  className="absolute bottom-[20%] right-[20%] w-96 h-96 bg-zinc-700/20 rounded-full blur-[120px]"
+                  className="absolute bottom-[20%] right-[20%] w-96 h-96 bg-zinc-700/20 rounded-full blur-[120px] pointer-events-none"
                   animate={{ scale: [1, 1.3, 1], opacity: [0.2, 0.5, 0.2] }}
                   transition={{ duration: 10, repeat: Infinity, ease: "easeInOut", delay: 2 }}
                 />
@@ -1066,14 +1098,14 @@ Plant conceptual seeds now for action in his next personal year. Present thought
                   <div className="flex flex-col sm:flex-row justify-center gap-4 sm:gap-6 px-8 sm:px-0">
                     <button 
                       onClick={() => setActiveTab('player')}
-                      className="w-full sm:w-auto px-10 py-4 rounded-full gold-gradient text-black text-[10px] sm:text-xs font-bold uppercase tracking-widest hover:scale-105 transition-all shadow-xl shadow-gold/10"
+                      className="w-full sm:w-auto px-10 py-5 sm:py-4 rounded-full gold-gradient text-black text-xs sm:text-sm font-bold uppercase tracking-widest hover:scale-105 transition-all shadow-xl shadow-gold/10"
                     >
                       Enter Studio
                     </button>
                     <a 
                       href="https://suno.com/@fairwaydreams" 
                       target="_blank"
-                      className="w-full sm:w-auto px-10 py-4 rounded-full bg-white/5 border border-white/10 text-white text-[10px] sm:text-xs font-bold uppercase tracking-widest hover:bg-white/10 transition-all text-center"
+                      className="w-full sm:w-auto px-10 py-5 sm:py-4 rounded-full bg-white/5 border border-white/10 text-white text-xs sm:text-sm font-bold uppercase tracking-widest hover:bg-white/10 transition-all text-center flex items-center justify-center"
                     >
                       Suno Profile
                     </a>
@@ -1083,7 +1115,7 @@ Plant conceptual seeds now for action in his next personal year. Present thought
                 {/* Stats */}
                 <motion.div 
                   style={{ y: statsY }}
-                  className="absolute bottom-8 md:bottom-12 left-0 right-0 flex justify-center gap-8 sm:gap-12 md:gap-24"
+                  className="mt-16 sm:mt-24 w-full flex justify-center gap-8 sm:gap-12 md:gap-24 relative z-10"
                 >
                   {[
                     { label: 'Plays', value: '26K+' },
@@ -1096,6 +1128,84 @@ Plant conceptual seeds now for action in his next personal year. Present thought
                     </div>
                   ))}
                 </motion.div>
+              </section>
+
+              {/* Featured Songs Section */}
+              <section className="container-max section-padding pb-12">
+                <div className="mb-12 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+                  <div>
+                    <h2 className="font-display text-2xl md:text-4xl text-white mb-2">Featured Tracks</h2>
+                    <p className="text-zinc-400 text-xs sm:text-sm uppercase tracking-widest">Handpicked selections</p>
+                  </div>
+                  <button 
+                    onClick={() => setActiveTab('player')}
+                    className="text-gold text-xs uppercase tracking-[0.2em] hover:text-white transition-colors"
+                  >
+                    View All Tracks →
+                  </button>
+                </div>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                  {tracks.slice(0, 4).map((track, i) => (
+                    <motion.div
+                      key={track.id}
+                      initial={{ opacity: 0, y: 20 }}
+                      whileInView={{ opacity: 1, y: 0 }}
+                      viewport={{ once: true }}
+                      transition={{ duration: 0.5, delay: i * 0.1 }}
+                      className="group relative bg-white/5 border border-white/10 rounded-2xl overflow-hidden hover:bg-white/10 transition-all flex flex-col"
+                    >
+                      <div className="relative aspect-square overflow-hidden">
+                        <img 
+                          src={track.art} 
+                          alt={track.title}
+                          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                          <button 
+                            onClick={() => handleTrackSelect(track)}
+                            className="w-14 h-14 rounded-full gold-gradient flex items-center justify-center text-black hover:scale-110 transition-transform shadow-xl shadow-gold/20"
+                          >
+                            {currentTrack.id === track.id && isPlaying ? (
+                              <Pause size={24} fill="currentColor" />
+                            ) : (
+                              <Play size={24} fill="currentColor" className="ml-1" />
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                      
+                      <div className="p-5 flex-1 flex flex-col justify-between gap-4 relative z-10">
+                        <div>
+                          <h3 className="text-white font-bold mb-1 truncate">{track.title}</h3>
+                          <p className="text-zinc-400 text-[10px] uppercase tracking-wider mb-3">Suno // fairwaydreams</p>
+                          <div className="flex flex-wrap gap-1">
+                            {track.genre.slice(0, 2).map(g => (
+                              <span key={g} className="px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-[9px] uppercase tracking-wider text-zinc-300">
+                                {g}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                        
+                        <div className="pt-4 border-t border-white/10 flex justify-between items-center">
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleTrackSelect(track);
+                            }}
+                            className="text-xs text-gold uppercase tracking-widest hover:text-white transition-colors"
+                          >
+                            Listen Now
+                          </button>
+                          {track.bpm && (
+                            <span className="text-[10px] text-zinc-500 font-mono">{track.bpm} BPM</span>
+                          )}
+                        </div>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
               </section>
             </motion.div>
           )}
@@ -1119,6 +1229,16 @@ Plant conceptual seeds now for action in his next personal year. Present thought
                 themeName={vizSettings.themeName}
                 isFavorite={(profile.likedTrackIds || []).includes(currentTrack.id)}
                 playlists={playlists.filter(p => p.userId === user?.uid || profile.role === 'admin')}
+                isShuffle={isShuffle}
+                repeatMode={repeatMode}
+                onToggleShuffle={() => setIsShuffle(!isShuffle)}
+                onToggleRepeat={() => {
+                  setRepeatMode(prev => {
+                    if (prev === 'none') return 'all';
+                    if (prev === 'all') return 'one';
+                    return 'none';
+                  });
+                }}
                 onTogglePlay={() => togglePlay(currentTrack.mediaUrl)}
                 onPrev={handlePrev}
                 onNext={handleNext}
@@ -1816,9 +1936,7 @@ Plant conceptual seeds now for action in his next personal year. Present thought
         </div>
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-8 relative z-10">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg gold-gradient flex items-center justify-center text-black">
-              <Drone size={16} />
-            </div>
+            <img src="/logo.png" alt="Fairway Dreams Logo" className="w-8 h-8 object-contain drop-shadow-[0_0_10px_rgba(212,175,55,0.3)]" />
             <span className="font-display text-sm text-white tracking-widest uppercase">Fairway Dreams</span>
           </div>
           
